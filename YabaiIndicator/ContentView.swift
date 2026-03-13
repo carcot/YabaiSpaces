@@ -92,6 +92,7 @@ struct ThumbnailSpaceButton : View {
     var windows: [Window]
     var displays: [Display]
     var layout: PanelLayout = PanelLayout()
+    var isSelected: Bool = false  // Keyboard selection state
     @State private var thumbnail: NSImage?
     @State private var thumbnailSpaceId: UInt64 = 0  // Track which space this thumbnail belongs to
 
@@ -122,9 +123,20 @@ struct ThumbnailSpaceButton : View {
                     }
                 }
                 .overlay(
-                    // Border styling: accent for active, subtle gray for inactive
-                    RoundedRectangle(cornerRadius: 0)
-                        .stroke(space.active ? Color.accentColor : Color.gray.opacity(0.5), lineWidth: space.active ? 2 : 1)
+                    // Border styling: selection + active state
+                    ZStack {
+                        // Selection border (outermost, bright accent - 4px for visibility)
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 0)
+                                .stroke(Color.accentColor, lineWidth: 4)
+                        }
+
+                        // Active state border (inside selection border)
+                        let activeInset: CGFloat = isSelected ? 4 : 0
+                        RoundedRectangle(cornerRadius: 0)
+                            .inset(by: activeInset)
+                            .stroke(space.active && !isSelected ? Color.accentColor : Color.gray.opacity(0.5), lineWidth: space.active && !isSelected ? 2 : 1)
+                    }
                 )
                 .onAppear {
                     loadThumbnail(for: space, display: display, windows: windows, size: targetSize)
@@ -255,6 +267,8 @@ struct PanelContentView: View {
     @AppStorage("showDisplaySeparator") private var showDisplaySeparator = true
     @AppStorage("showCurrentSpaceOnly") private var showCurrentSpaceOnly = false
 
+    @State private var selectedSpaceIndex: Int? = nil  // Track keyboard-selected space
+
     var layout: PanelLayout { PanelLayout(from: UserDefaults.standard) }
 
     private func generateSpaces() -> [Space] {
@@ -274,22 +288,46 @@ struct PanelContentView: View {
         return shownSpaces
     }
 
+    // Get only navigable spaces (exclude dividers) for keyboard navigation
+    private func getNavigableSpaces() -> [Space] {
+        return generateSpaces().filter { $0.type != .divider }
+    }
+
     var body: some View {
+        let spaces = generateSpaces()
+        let navigableSpaces = spaces.filter { $0.type != .divider }
+
         LazyVGrid(columns: layout.columns, spacing: layout.rowSpacing) {
             if buttonStyle == .numeric || spaceModel.displays.count > 0 {
-                ForEach(generateSpaces(), id: \.self) {space in
-                    switch buttonStyle {
-                    case .numeric:
-                        SpaceButton(space: space, layout: layout)
-                    case .windows:
-                        WindowSpaceButton(space: space, windows: spaceModel.windows.filter{$0.spaceIndex == space.yabaiIndex}, displays: spaceModel.displays, layout: layout)
-                    case .thumbnail:
-                        ThumbnailSpaceButton(space: space, windows: spaceModel.windows.filter{$0.spaceIndex == space.yabaiIndex}, displays: spaceModel.displays, layout: layout)
+                ForEach(Array(spaces.enumerated()), id: \.element) { index, space in
+                    // Calculate navigable index for this space
+                    let navigableIndex = navigableSpaces.firstIndex(where: { $0.spaceid == space.spaceid && $0.type != .divider })
+
+                    Group {
+                        switch buttonStyle {
+                        case .numeric:
+                            SpaceButton(space: space, layout: layout)
+                        case .windows:
+                            WindowSpaceButton(space: space, windows: spaceModel.windows.filter{$0.spaceIndex == space.yabaiIndex}, displays: spaceModel.displays, layout: layout)
+                        case .thumbnail:
+                            ThumbnailSpaceButton(
+                                space: space,
+                                windows: spaceModel.windows.filter{$0.spaceIndex == space.yabaiIndex},
+                                displays: spaceModel.displays,
+                                layout: layout,
+                                isSelected: navigableIndex == selectedSpaceIndex
+                            )
+                        }
                     }
                 }
             }
         }
         .padding(layout.padding)
+        .onReceive(NotificationCenter.default.publisher(for: YabaiAppDelegate.panelNavigationNotification)) { notification in
+            if let index = notification.userInfo?["selectedIndex"] as? Int {
+                selectedSpaceIndex = index >= 0 ? index : nil
+            }
+        }
         .contextMenu {
             Button("Preferences...") {
                 NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)

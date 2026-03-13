@@ -91,3 +91,42 @@ Added border-based highlight system:
 - Active space clearly distinguished with accent color border
 - Inactive spaces have subtle gray borders
 - Cleaner appearance without double borders
+
+## 2025-03-13: Add Keyboard Navigation to Floating Panel
+
+### Problem
+No way to navigate and select spaces using keyboard - mouse required.
+
+### Solution
+Added full keyboard navigation to the floating panel:
+
+**Navigation:**
+- Arrow keys (up/down/left/right) navigate between spaces with wrap-around
+- Selection follows grid layout (respects column count)
+- Selection persists during navigation session
+
+**Selection:**
+- Enter or Space: Switch to selected space and close panel
+- Works even when current space is already selected (just closes panel)
+- Escape: Close panel without switching
+
+**Visual Feedback:**
+- Selected space shows 4px accent color border (outermost)
+- Active space shows 2px accent color border (inside selection border when both apply)
+- Selection resets to current active space when panel opens
+
+**Implementation:**
+- Keyboard handling in `YabaiAppDelegate.handlePanelKeyEvent()`
+- Notification-based communication to SwiftUI views
+- Works with existing local event monitor for panel visibility
+
+### Files Modified
+- `YabaiAppDelegate.swift`: Added `handlePanelKeyEvent()`, `resetPanelSelection()`, extended key monitor
+- `ContentView.swift`: Added selection state, notification handling, visual selection border
+
+### Testing
+- Arrow keys navigate with wrap-around at edges
+- Enter/Space switches and closes panel
+- Escape closes panel
+- Selection highlight visible (4px accent border)
+- Selection resets to active space when panel opens

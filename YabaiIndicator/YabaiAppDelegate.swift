@@ -313,6 +313,9 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
             NSLog("showPanel: WARNING - no active space found to capture (excluded divisors)")
         }
 
+        // Reset keyboard selection to active space
+        resetPanelSelection()
+
         panel.orderFrontRegardless()
         panel.makeKey()
 
@@ -355,16 +358,18 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
 
         // Local monitor for Escape key to hide panel - ONLY when panel is visible
         let keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            // Only handle Escape if panel is visible
+            // Only handle keys if panel is visible
             guard let panel = self?.floatingPanel, panel.isVisible else {
-                return event  // Let Escape pass through normally
+                return event  // Let keys pass through normally
             }
             NSLog("Local keyDown: keyCode=\(event.keyCode), panel.visible=\(panel.isVisible)")
-            if event.keyCode == 53 {  // 53 = Escape
-                NSLog("Escape pressed (local), hiding panel")
-                self?.hidePanel()
+
+            // Handle navigation keys for panel
+            let handled = self?.handlePanelKeyEvent(event) ?? false
+            if handled {
                 return nil  // Consume the event
             }
+
             return event
         }
 
@@ -435,6 +440,100 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         case .thumbnail: newStyle = .numeric
         }
         UserDefaults.standard.set(newStyle.rawValue, forKey: "buttonStyle")
+    }
+
+    // MARK: - Panel Keyboard Navigation
+
+    // Notification names for panel navigation
+    static let panelNavigationNotification = Notification.Name("panelNavigation")
+    private var panelSelectedIndex: Int? = nil
+
+    func resetPanelSelection() {
+        // Reset selection to active space and post notification
+        let spaces = spaceModel.spaces.filter { $0.type == .standard }
+        if let activeIndex = spaces.firstIndex(where: { $0.active }) {
+            panelSelectedIndex = activeIndex
+            NotificationCenter.default.post(
+                name: YabaiAppDelegate.panelNavigationNotification,
+                object: nil,
+                userInfo: ["selectedIndex": activeIndex]
+            )
+        } else {
+            panelSelectedIndex = nil
+            NotificationCenter.default.post(
+                name: YabaiAppDelegate.panelNavigationNotification,
+                object: nil,
+                userInfo: ["selectedIndex": -1]  // -1 means clear selection
+            )
+        }
+    }
+
+    func handlePanelKeyEvent(_ event: NSEvent) -> Bool {
+        let spaces = spaceModel.spaces.filter { $0.type == .standard }
+        guard !spaces.isEmpty else { return false }
+
+        let panelLayout = PanelLayout(from: UserDefaults.standard)
+        let columnCount = panelLayout.columns.count
+        let maxIndex = spaces.count - 1
+
+        // Initialize selection to active space if none selected
+        var currentIndex = panelSelectedIndex ?? {
+            if let activeSpace = spaces.firstIndex(where: { $0.active }) {
+                return activeSpace
+            }
+            return 0
+        }()
+
+        var newIndex = currentIndex
+
+        switch event.keyCode {
+        case 126: // Up Arrow
+            if currentIndex >= columnCount {
+                newIndex = currentIndex - columnCount
+            } else {
+                // Wrap to bottom row
+                let lastRowStart = ((spaces.count - 1) / columnCount) * columnCount
+                newIndex = min(lastRowStart + currentIndex, spaces.count - 1)
+            }
+        case 125: // Down Arrow
+            let nextRow = currentIndex + columnCount
+            if nextRow <= maxIndex {
+                newIndex = nextRow
+            } else {
+                // Wrap to top row
+                newIndex = currentIndex % columnCount
+            }
+        case 123: // Left Arrow
+            newIndex = currentIndex > 0 ? currentIndex - 1 : maxIndex
+        case 124: // Right Arrow
+            newIndex = currentIndex < maxIndex ? currentIndex + 1 : 0
+        case 36, 49: // Return or Space
+            // Always hide panel - if different space selected, switch to it first
+            let selectedSpace = spaces[currentIndex]
+            if !selectedSpace.active && selectedSpace.yabaiIndex > 0 {
+                switchSpace(to: selectedSpace.yabaiIndex)
+            }
+            // Always hide panel after selection
+            hidePanel()
+            return true
+        case 53: // Escape
+            NSLog("Escape pressed, hiding panel")
+            hidePanel()
+            return true
+        default:
+            return false
+        }
+
+        panelSelectedIndex = newIndex
+
+        // Post notification for SwiftUI to update selection
+        NotificationCenter.default.post(
+            name: YabaiAppDelegate.panelNavigationNotification,
+            object: nil,
+            userInfo: ["selectedIndex": newIndex]
+        )
+
+        return true
     }
 
     func stopClickOutsideMonitor() {
