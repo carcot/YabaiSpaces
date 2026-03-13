@@ -163,6 +163,7 @@ private func drawWindowOutlines(in content: NSRect, windows: [Window], display: 
 
 /// Generate a hybrid preview image with desktop background and window outlines
 /// Used for spaces without cached thumbnails
+/// No border - borders are handled by SwiftUI overlay for cleaner styling
 func generateHybridPreviewImage(active: Bool, visible: Bool, windows: [Window], display: Display, scale: CGFloat = 1.0) -> NSImage {
     // Calculate size proportional to display aspect ratio
     let baseHeight: CGFloat = 20 * scale
@@ -190,19 +191,12 @@ func generateHybridPreviewImage(active: Bool, visible: Bool, windows: [Window], 
         // Draw window outlines
         drawWindowOutlines(in: canvas, windows: windows, display: display)
     } else {
-        // Draw border outline
-        NSColor.black.setStroke()
-        let borderPath = NSBezierPath(rect: canvas.insetBy(dx: 0.5, dy: 0.5))
-        borderPath.lineWidth = 1.0
-        borderPath.stroke()
-
         // Draw desktop wallpaper if available, otherwise use fallback color
         if let desktop = desktopCaptured {
-            // Dim the desktop slightly for inactive state
-            desktop.draw(in: canvas.insetBy(dx: 1.0, dy: 1.0))
+            desktop.draw(in: canvas)
         } else {
             NSColor(red: 0.5, green: 0.5, blue: 0.55, alpha: 1.0).setFill()
-            NSBezierPath(rect: canvas.insetBy(dx: 1.0, dy: 1.0)).fill()
+            NSBezierPath(rect: canvas).fill()
         }
 
         // Draw window outlines

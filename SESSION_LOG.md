@@ -70,3 +70,24 @@ Thumbnail style showed nothing (or poor preview) for spaces without cached thumb
 - Switching to space: real thumbnail captured and cached
 - Subsequent panel opens: visited spaces show cached thumbnails, unvisited show hybrid preview
 - Active space now immediately shows captured thumbnail (not outlines) on panel open
+
+## 2025-03-13: Add Active Space Highlight Border
+
+### Problem
+No clear visual indication of which space is currently active in the floating panel.
+
+### Solution
+Added border-based highlight system:
+- Active space: 2px system accent color border (blue by default)
+- Inactive spaces: 1px subtle gray border
+- Removed redundant black border from hybrid preview image generation
+- Borders handled by SwiftUI overlay for consistent styling across all button types
+
+### Files Modified
+- `ContentView.swift`: Added unified border overlay (accent for active, gray for inactive)
+- `ImageGenerator.swift`: Removed black border from `generateHybridPreviewImage()`
+
+### Testing
+- Active space clearly distinguished with accent color border
+- Inactive spaces have subtle gray borders
+- Cleaner appearance without double borders

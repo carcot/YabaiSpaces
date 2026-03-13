@@ -121,6 +121,11 @@ struct ThumbnailSpaceButton : View {
                         Image(nsImage: generateHybridPreviewImage(active: space.active, visible: space.visible, windows: windows, display: display, scale: layout.scale))
                     }
                 }
+                .overlay(
+                    // Border styling: accent for active, subtle gray for inactive
+                    RoundedRectangle(cornerRadius: 0)
+                        .stroke(space.active ? Color.accentColor : Color.gray.opacity(0.5), lineWidth: space.active ? 2 : 1)
+                )
                 .onAppear {
                     loadThumbnail(for: space, display: display, windows: windows, size: targetSize)
                 }
