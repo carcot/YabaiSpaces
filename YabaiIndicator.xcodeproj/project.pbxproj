@@ -29,6 +29,7 @@
 		5086FE87278303EE00E51F61 /* NativeClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5086FE86278303EE00E51F61 /* NativeClient.swift */; };
 		5086FE892783598E00E51F61 /* SpaceType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5086FE882783598E00E51F61 /* SpaceType.swift */; };
 		50DF24C7277BD18700DF1906 /* ImageGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50DF24C6277BD18700DF1906 /* ImageGenerator.swift */; };
+		7592BA952F638A7400829D81 /* ThreeFingerTap.m in Sources */ = {isa = PBXBuildFile; fileRef = 7592BA942F638A2A00829D81 /* ThreeFingerTap.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -79,6 +80,8 @@
 		5086FE86278303EE00E51F61 /* NativeClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeClient.swift; sourceTree = "<group>"; };
 		5086FE882783598E00E51F61 /* SpaceType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceType.swift; sourceTree = "<group>"; };
 		50DF24C6277BD18700DF1906 /* ImageGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageGenerator.swift; sourceTree = "<group>"; };
+		7592BA912F63878400829D81 /* ThreeFingerTap.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ThreeFingerTap.h; path = YabaiIndicator/ThreeFingerTap.h; sourceTree = "<group>"; };
+		7592BA942F638A2A00829D81 /* ThreeFingerTap.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = ThreeFingerTap.m; path = YabaiIndicator/ThreeFingerTap.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -114,6 +117,8 @@
 		5061205F2779212000E8F192 = {
 			isa = PBXGroup;
 			children = (
+				7592BA942F638A2A00829D81 /* ThreeFingerTap.m */,
+				7592BA912F63878400829D81 /* ThreeFingerTap.h */,
 				506120B0277A8F5200E8F192 /* README.md */,
 				5061206A2779212000E8F192 /* YabaiIndicator */,
 				5061207C2779212200E8F192 /* YabaiIndicatorTests */,
@@ -349,6 +354,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7592BA952F638A7400829D81 /* ThreeFingerTap.m in Sources */,
 				506120AF277A7BF800E8F192 /* SpacesModel.swift in Sources */,
 				5086FE87278303EE00E51F61 /* NativeClient.swift in Sources */,
 				50DF24C7277BD18700DF1906 /* ImageGenerator.swift in Sources */,
@@ -522,7 +528,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"YabaiIndicator/Preview Content\"";
-				DEVELOPMENT_TEAM = T3UD8QX5G4;
+				DEVELOPMENT_TEAM = 7CJ3BM3AGT;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -557,7 +563,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"YabaiIndicator/Preview Content\"";
-				DEVELOPMENT_TEAM = T3UD8QX5G4;
+				DEVELOPMENT_TEAM = 7CJ3BM3AGT;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;

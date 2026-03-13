@@ -8,6 +8,80 @@
 import SwiftUI
 import Socket
 import Combine
+import os.log
+import Carbon
+
+// File logger for debugging - write to file so we can debug after panel closes
+let logger = OSLog(subsystem: "de.arsbrevis.YabaiIndicator", category: "Main")
+
+func log(_ message: String) {
+    os_log("%{public}@", log: logger, type: .info, message)
+    // Also write to file for easier access
+    if let logURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("yabai_indicator.txt") {
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let logMessage = "\(timestamp) - \(message)\n"
+        if let data = logMessage.data(using: .utf8) {
+            if FileManager.default.fileExists(atPath: logURL.path) {
+                if let handle = try? FileHandle(forWritingTo: logURL) {
+                    handle.seekToEndOfFile()
+                    handle.write(data)
+                    handle.closeFile()
+                }
+            } else {
+                try? data.write(to: logURL)
+            }
+        }
+    }
+}
+
+// Global hotkey using Carbon
+class GlobalHotkey {
+    private var hotkeyRef: EventHotKeyRef?
+    private var handler: (() -> Void)?
+
+    func register(keyCode: UInt32, modifiers: UInt32, handler: @escaping () -> Void) -> Bool {
+        self.handler = handler
+
+        var hotkeyID = EventHotKeyID(signature: OSType(0x59494920), id: 1) // 'YI ' + 1
+
+        let status = RegisterEventHotKey(
+            keyCode,
+            modifiers,
+            hotkeyID,
+            GetApplicationEventTarget(),
+            0,
+            &hotkeyRef
+        )
+
+        if status != noErr {
+            log("Failed to register hotkey: \(status)")
+            return false
+        }
+
+        log("Hotkey registered successfully")
+
+        // Install event handler
+        var mySpec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        var handlerRef: EventHandlerRef?
+
+        let selfPtr = Unmanaged.passRetained(self).toOpaque()
+
+        InstallEventHandler(GetApplicationEventTarget(), { (nextHandler, theEvent, userData) -> OSStatus in
+            log("=== Hotkey event received! ===")
+            if let userData = userData {
+                let hotkey = Unmanaged<GlobalHotkey>.fromOpaque(userData).takeUnretainedValue()
+                log("Calling handler...")
+                hotkey.handler?()
+                log("Handler called")
+            } else {
+                log("ERROR: userData is nil!")
+            }
+            return noErr
+        }, 1, &mySpec, selfPtr, &handlerRef)
+
+        return true
+    }
+}
 
 extension UserDefaults {
     @objc dynamic var showDisplaySeparator: Bool {
@@ -26,15 +100,20 @@ extension UserDefaults {
 }
 
 class YabaiAppDelegate: NSObject, NSApplicationDelegate {
+    var floatingPanel: NSPanel?
     var statusBarItem: NSStatusItem?
     var application: NSApplication = NSApplication.shared
     var spaceModel = SpaceModel()
-    
-    let statusBarHeight = 22
-    let itemWidth:CGFloat = 30
-    
+
+    let statusBarHeight: CGFloat = 22
+    let itemWidth: CGFloat = 30
+    let panelPadding: CGFloat = 8
+
     var sinks: [AnyCancellable?] = []
     var receiverQueue = DispatchQueue(label: "yabai-indicator.socket.receiver")
+    var eventMonitors: [Any] = []
+    var hotkeyMonitors: [Any] = []
+    var globalHotkey: GlobalHotkey?
 
     @objc
     func onSpaceChanged(_ notification: Notification) {
@@ -47,7 +126,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func refreshData() {
-        // NSLog("Refreshing")
+        // log("Refreshing")
         receiverQueue.async {
             self.onSpaceRefresh()
             self.onWindowRefresh()
@@ -76,16 +155,139 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     func refreshBar() {
         let showDisplaySeparator = UserDefaults.standard.bool(forKey: "showDisplaySeparator")
         let showCurrentSpaceOnly = UserDefaults.standard.bool(forKey: "showCurrentSpaceOnly")
-        
+
         let numButtons = showCurrentSpaceOnly ?  spaceModel.displays.count : spaceModel.spaces.count
-        
+
         var newWidth = CGFloat(numButtons) * itemWidth
         if !showDisplaySeparator {
             newWidth -= CGFloat((spaceModel.displays.count - 1) * 10)
         }
+        newWidth += panelPadding * 2
+
         statusBarItem?.button?.frame.size.width = newWidth
         statusBarItem?.button?.subviews[0].frame.size.width = newWidth
 
+        floatingPanel?.setContentSize(NSSize(width: newWidth, height: statusBarHeight + panelPadding * 2))
+    }
+
+    func createFloatingPanel() {
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 300, height: 50),
+            styleMask: [.nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.level = .floating
+        panel.isFloatingPanel = true
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = true
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+
+        let hostingView = NSHostingView(rootView: ContentView().environmentObject(spaceModel))
+        hostingView.wantsLayer = true
+        hostingView.layer?.cornerRadius = 6
+        hostingView.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.95).cgColor
+        panel.contentView = hostingView
+
+        floatingPanel = panel
+    }
+
+    func showPanel(at mouseLocation: NSPoint) {
+        guard let panel = floatingPanel else { return }
+
+        log("showPanel at: \(mouseLocation)")
+
+        // Calculate panel position centered on mouse
+        let panelSize = panel.frame.size
+        let newX = mouseLocation.x - panelSize.width / 2
+        let newY = mouseLocation.y - panelSize.height / 2
+
+        panel.setFrameOrigin(NSPoint(x: newX, y: newY))
+        panel.orderFrontRegardless()
+        NSApp.activate(ignoringOtherApps: true)
+
+        // Start monitoring for clicks outside
+        log("Starting click monitors...")
+        startClickOutsideMonitor()
+    }
+
+    func hidePanel() {
+        log("hidePanel called")
+        floatingPanel?.orderOut(nil)
+        stopClickOutsideMonitor()
+    }
+
+    func startClickOutsideMonitor() {
+        stopClickOutsideMonitor() // Remove any existing monitor
+
+        // Local monitor for clicks within our app (including panel buttons)
+        let localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
+            log("Local click, hiding after delay")
+            // Let the click pass through first, then hide
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                self?.hidePanel()
+            }
+            return event
+        }
+
+        // Global monitor for clicks in other apps
+        let globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
+            log("Global click, hiding panel")
+            self?.hidePanel()
+        }
+
+        if let local = localMonitor { eventMonitors.append(local) }
+        if let global = globalMonitor { eventMonitors.append(global) }
+        log("Click monitors started: local=\(localMonitor != nil), global=\(globalMonitor != nil)")
+    }
+
+    func stopClickOutsideMonitor() {
+        log("Stopping click monitors, removing \(eventMonitors.count) monitors")
+        for monitor in eventMonitors {
+            NSEvent.removeMonitor(monitor)
+        }
+        eventMonitors.removeAll()
+    }
+
+    func setupTripleClickMonitor() {
+        log("setupTripleClickMonitor called")
+
+        // Use Carbon for reliable global hotkey
+        let hotkey = GlobalHotkey()
+        // KeyCode 49 = Space, modifiers: cmdKey = 256 (0x100), optionKey = 2048 (0x800)
+        let modifiers: UInt32 = UInt32(cmdKey | optionKey)
+        let success = hotkey.register(keyCode: 49, modifiers: modifiers) { [weak self] in
+            log("Carbon hotkey triggered!")
+            self?.togglePanel(at: NSEvent.mouseLocation)
+        }
+
+        if success {
+            globalHotkey = hotkey
+            log("Carbon hotkey registered successfully")
+        } else {
+            log("Failed to register Carbon hotkey, falling back to NSEvent")
+        }
+    }
+
+    func togglePanel(at mouseLocation: NSPoint) {
+        log("=== togglePanel called at: \(mouseLocation) ===")
+        log("Panel exists: \(floatingPanel != nil)")
+        log("Panel visible: \(floatingPanel?.isVisible ?? false)")
+        guard let panel = floatingPanel else {
+            log("ERROR: No panel exists!")
+            return
+        }
+
+        if panel.isVisible {
+            log("Panel visible, hiding")
+            hidePanel()
+        } else {
+            log("Panel not visible, showing")
+            // Force the panel to be ordered out first to reset state
+            panel.orderOut(nil)
+            showPanel(at: mouseLocation)
+        }
     }
     
     func socketServer() async {
@@ -96,25 +298,25 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
                 let conn = try socket.acceptClientConnection()
                 let msg = try conn.readString()?.trimmingCharacters(in: .whitespacesAndNewlines)
                 conn.close()
-                // NSLog("Received message: \(msg!).")
+                // log("Received message: \(msg!).")
                 if msg == "refresh" {
                     self.refreshData()
                 } else if msg == "refresh spaces" {
                     receiverQueue.async {
-                        // NSLog("Refreshing on main thread")
+                        // log("Refreshing on main thread")
                         self.onSpaceRefresh()
                     }
                 } else if msg == "refresh windows" {
                     receiverQueue.async {
-                        // NSLog("Refreshing on main thread")
+                        // log("Refreshing on main thread")
                         self.onWindowRefresh()
                     }
                 }
             }
         } catch {
-            NSLog("SocketServer Error: \(error)")
+            log("SocketServer Error: \(error)")
         }
-        NSLog("SocketServer Ended")
+        log("SocketServer Ended")
     }
     
     @objc
@@ -161,6 +363,16 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func refreshButtonStyle() {
+        // Update floating panel content
+        if let panel = floatingPanel {
+            let hostingView = NSHostingView(rootView: ContentView().environmentObject(spaceModel))
+            hostingView.wantsLayer = true
+            hostingView.layer?.cornerRadius = 6
+            hostingView.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.95).cgColor
+            panel.contentView = hostingView
+        }
+
+        // Update status bar
         for subView in statusBarItem?.button?.subviews ?? [] {
             subView.removeFromSuperview()
         }
@@ -173,7 +385,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
             let dict = NSDictionary(contentsOfFile: prefs) as? [String : Any] {
           UserDefaults.standard.register(defaults: dict)
         }
-        
+
         sinks = [
             spaceModel.objectWillChange.sink{_ in self.refreshBar()},
             UserDefaults.standard.publisher(for: \.showDisplaySeparator).sink {_ in self.refreshBar()},
@@ -181,14 +393,21 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
             UserDefaults.standard.publisher(for: \.buttonStyle).sink {_ in self.refreshButtonStyle()}
 
         ]
-        
+
         Task {
             await self.socketServer()
         }
+
+        // Create status bar item (for menu access)
         statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        
         statusBarItem?.menu = createMenu()
-        
+
+        // Create floating panel
+        createFloatingPanel()
+
+        // Set up triple-click monitor
+        setupTripleClickMonitor()
+
         refreshButtonStyle()
         registerObservers()
     }
