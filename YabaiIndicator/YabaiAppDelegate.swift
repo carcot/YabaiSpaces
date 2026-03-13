@@ -15,10 +15,10 @@ class GlobalHotkey {
     private var hotkeyRef: EventHotKeyRef?
     private var handler: (() -> Void)?
 
-    func register(keyCode: UInt32, modifiers: UInt32, id: UInt32 = 1, handler: @escaping () -> Void) -> Bool {
+    func register(keyCode: UInt32, modifiers: UInt32, handler: @escaping () -> Void) -> Bool {
         self.handler = handler
 
-        var hotkeyID = EventHotKeyID(signature: OSType(0x59494920), id: id) // 'YI ' + unique id
+        var hotkeyID = EventHotKeyID(signature: OSType(0x59494920), id: 1) // 'YI ' + 1
 
         let status = RegisterEventHotKey(
             keyCode,
@@ -49,13 +49,6 @@ class GlobalHotkey {
         }, 1, &mySpec, selfPtr, &handlerRef)
 
         return true
-    }
-
-    func unregister() {
-        if let ref = hotkeyRef {
-            UnregisterEventHotKey(ref)
-            hotkeyRef = nil
-        }
     }
 }
 
@@ -90,7 +83,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     var receiverQueue = DispatchQueue(label: "yabai-indicator.socket.receiver")
     var eventMonitors: [Any] = []
     var globalHotkey: GlobalHotkey?
-    var escapeHotkey: GlobalHotkey?
 
     @objc
     func onSpaceChanged(_ notification: Notification) {
@@ -273,6 +265,15 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
             return event
         }
 
+        // Local monitor for Escape key to hide panel
+        let keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.keyCode == 53 {  // 53 = Escape
+                self?.hidePanel()
+                return nil  // Consume the event
+            }
+            return event
+        }
+
         // Global monitor for clicks in other apps - hide on any click
         // Note: This may cause benign Mach port warnings in logs when accessing events from other processes
         let globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
@@ -280,6 +281,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if let local = localMonitor { eventMonitors.append(local) }
+        if let key = keyMonitor { eventMonitors.append(key) }
         if let global = globalMonitor { eventMonitors.append(global) }
     }
 
@@ -337,22 +339,12 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         let hotkey = GlobalHotkey()
         // KeyCode 49 = Space, modifiers: cmdKey = 256 (0x100), optionKey = 2048 (0x800)
         let modifiers: UInt32 = UInt32(cmdKey | optionKey)
-        let success = hotkey.register(keyCode: 49, modifiers: modifiers, id: 1) { [weak self] in
+        let success = hotkey.register(keyCode: 49, modifiers: modifiers) { [weak self] in
             self?.togglePanel(at: NSEvent.mouseLocation)
         }
 
         if success {
             globalHotkey = hotkey
-        }
-
-        // Set up Escape key handler to hide the panel
-        let escapeHotkey = GlobalHotkey()
-        // KeyCode 53 = Escape, no modifiers (0), use id: 2 to avoid conflict
-        let escapeSuccess = escapeHotkey.register(keyCode: 53, modifiers: 0, id: 2) { [weak self] in
-            self?.hidePanel()
-        }
-        if escapeSuccess {
-            self.escapeHotkey = escapeHotkey
         }
     }
 
