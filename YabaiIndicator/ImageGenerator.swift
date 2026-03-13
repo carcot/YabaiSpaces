@@ -162,8 +162,8 @@ private func drawWindowOutlines(in content: NSRect, windows: [Window], display: 
 }
 
 /// Generate a hybrid preview image with desktop background and window outlines
+/// Uses cached desktop+icons wallpaper, then draws window outlines on top
 /// Used for spaces without cached thumbnails
-/// No border - borders are handled by SwiftUI overlay for cleaner styling
 func generateHybridPreviewImage(active: Bool, visible: Bool, windows: [Window], display: Display, scale: CGFloat = 1.0) -> NSImage {
     // Calculate size proportional to display aspect ratio
     let baseHeight: CGFloat = 20 * scale
@@ -176,32 +176,22 @@ func generateHybridPreviewImage(active: Bool, visible: Bool, windows: [Window], 
 
     image.lockFocus()
 
-    // Try to capture desktop wallpaper as background
-    let desktopCaptured = gPrivateWindowCapture.captureDesktop(display: display, targetSize: size)
-
-    if active || visible {
-        // Draw desktop wallpaper if available, otherwise use fallback color
-        if let desktop = desktopCaptured {
-            desktop.draw(in: canvas)
+    // Try to get cached desktop+icons image (includes wallpaper and desktop icons)
+    if let desktop = gPrivateWindowCapture.captureDesktopWithIcons(targetSize: size) {
+        desktop.draw(in: canvas)
+    } else {
+        // Fallback to wallpaper-only if desktop+icons capture failed
+        if let wallpaper = gPrivateWindowCapture.captureDesktop(display: display, targetSize: size) {
+            wallpaper.draw(in: canvas)
         } else {
+            // Final fallback: solid color
             NSColor(red: 0.3, green: 0.35, blue: 0.45, alpha: 1.0).setFill()
             NSBezierPath(rect: canvas).fill()
         }
-
-        // Draw window outlines
-        drawWindowOutlines(in: canvas, windows: windows, display: display)
-    } else {
-        // Draw desktop wallpaper if available, otherwise use fallback color
-        if let desktop = desktopCaptured {
-            desktop.draw(in: canvas)
-        } else {
-            NSColor(red: 0.5, green: 0.5, blue: 0.55, alpha: 1.0).setFill()
-            NSBezierPath(rect: canvas).fill()
-        }
-
-        // Draw window outlines
-        drawWindowOutlines(in: canvas, windows: windows, display: display)
     }
+
+    // Draw window outlines
+    drawWindowOutlines(in: canvas, windows: windows, display: display)
 
     image.unlockFocus()
     image.isTemplate = false  // Not a template - has actual colors

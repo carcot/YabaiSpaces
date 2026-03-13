@@ -16,6 +16,11 @@ typealias CGWindowListCreateImageFromRectFn = @convention(c) (CGRect, CFArray?, 
 class PrivateWindowCapture {
     private let captureQueue = DispatchQueue(label: "yabai-indicator.capture", qos: .userInitiated)
 
+    // Cached desktop images
+    private var cachedWallpaper: NSImage?
+    private var cachedDesktop: NSImage?
+    private var cacheVersion = 0  // Increment to invalidate caches
+
     // Private API function pointers
     private var cgWindowListCreateImage: CGWindowListCreateImageFn?
     private var cgWindowListCreateImageFromRect: CGWindowListCreateImageFromRectFn?
@@ -129,37 +134,110 @@ class PrivateWindowCapture {
     }
 
     /// Capture just the desktop wallpaper for a display (no windows)
-    /// Reads the actual wallpaper image from system preferences
+    /// Uses cached wallpaper if available
     func captureDesktop(display: Display, targetSize: CGSize) -> NSImage? {
-        // Read wallpaper path from UserDefaults
-        // macOS stores desktop picture in workspace preferences
+        // Return cached wallpaper if available
+        if let wallpaper = cachedWallpaper {
+            // Check if cached size matches target size
+            if wallpaper.size == targetSize {
+                return wallpaper
+            } else {
+                // Need to resize
+                let scaled = NSImage(size: targetSize)
+                scaled.lockFocus()
+                wallpaper.draw(
+                    in: NSRect(origin: .zero, size: targetSize),
+                    from: NSRect(origin: .zero, size: wallpaper.size),
+                    operation: .copy,
+                    fraction: 1.0
+                )
+                scaled.unlockFocus()
+                return scaled
+            }
+        }
+
+        // Cache miss - read wallpaper from file
+        return loadWallpaper(targetSize: targetSize)
+    }
+
+    /// Capture desktop with icons for use in hybrid preview
+    /// Uses cached desktop+icons if available
+    func captureDesktopWithIcons(targetSize: CGSize) -> NSImage? {
+        // Return cached desktop+icons if available
+        if let desktop = cachedDesktop {
+            if desktop.size == targetSize {
+                return desktop
+            } else {
+                // Resize
+                let scaled = NSImage(size: targetSize)
+                scaled.lockFocus()
+                desktop.draw(
+                    in: NSRect(origin: .zero, size: targetSize),
+                    from: NSRect(origin: .zero, size: desktop.size),
+                    operation: .copy,
+                    fraction: 1.0
+                )
+                scaled.unlockFocus()
+                return scaled
+            }
+        }
+
+        // Cache miss - capture from first display
+        return captureAndCacheDesktopWithIcons(targetSize: targetSize)
+    }
+
+    /// Clear caches (call when wallpaper changes or to free memory)
+    func clearCaches() {
+        cachedWallpaper = nil
+        cachedDesktop = nil
+        cacheVersion += 1
+    }
+
+    // MARK: - Private cache methods
+
+    private func loadWallpaper(targetSize: CGSize) -> NSImage? {
         let workspace = NSWorkspace.shared
 
-        // Try to get desktop image URL for the specific display
-        for screen in NSScreen.screens {
-            let screenFrame = screen.frame
-            let displayFrame = display.frame
-
-            // Match by screen position
-            if abs(screenFrame.origin.x - displayFrame.origin.x) < 10 &&
-               abs(screenFrame.origin.y - displayFrame.origin.y) < 10 {
-                // Get desktop image for this screen
-                if let desktopImageURL = workspace.desktopImageURL(for: screen) {
-                    if let desktopImage = NSImage(contentsOf: desktopImageURL) {
-                        // Scale to target size
-                        let scaled = NSImage(size: targetSize)
-                        scaled.lockFocus()
-                        desktopImage.draw(
-                            in: NSRect(origin: .zero, size: targetSize),
-                            from: NSRect(origin: .zero, size: desktopImage.size),
-                            operation: .copy,
-                            fraction: 1.0
-                        )
-                        scaled.unlockFocus()
-                        return scaled
-                    }
-                }
+        // Try to get wallpaper from any screen (same across all displays)
+        if let screen = NSScreen.main,
+           let wallpaperURL = workspace.desktopImageURL(for: screen) {
+            if let wallpaper = NSImage(contentsOf: wallpaperURL) {
+                // Scale and cache
+                let scaled = NSImage(size: targetSize)
+                scaled.lockFocus()
+                wallpaper.draw(
+                    in: NSRect(origin: .zero, size: targetSize),
+                    from: NSRect(origin: .zero, size: wallpaper.size),
+                    operation: .copy,
+                    fraction: 1.0
+                )
+                scaled.unlockFocus()
+                cachedWallpaper = scaled
+                return scaled
             }
+        }
+
+        return nil
+    }
+
+    private func captureAndCacheDesktopWithIcons(targetSize: CGSize) -> NSImage? {
+        // Capture from first available display
+        var displayCount: UInt32 = 0
+        guard CGGetActiveDisplayList(32, nil, &displayCount) == .success, displayCount > 0 else {
+            return nil
+        }
+
+        var displayIDs = [CGDirectDisplayID](repeating: 0, count: Int(displayCount))
+        guard CGGetActiveDisplayList(32, &displayIDs, &displayCount) == .success else {
+            return nil
+        }
+
+        // Try to capture from first display (includes desktop + windows)
+        // This will show desktop + icons + any app windows as background
+        if let displayID = displayIDs.first, let cgImage = captureDisplay(displayID: displayID, targetSize: targetSize) {
+            let nsImage = NSImage(cgImage: cgImage, size: targetSize)
+            cachedDesktop = nsImage
+            return nsImage
         }
 
         return nil

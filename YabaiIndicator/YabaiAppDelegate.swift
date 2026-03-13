@@ -297,22 +297,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
 
         panel.setFrameOrigin(NSPoint(x: newX, y: newY))
 
-        // Capture thumbnail of current active space BEFORE showing panel
-        // (panel not visible yet, so it won't be in screenshot)
-        // Capture ANY active space, not just .standard type
-
-        // Debug: log all active spaces and their types
-        let activeSpaces = spaceModel.spaces.filter { $0.active }
-        NSLog("showPanel: active spaces: \(activeSpaces.map { "[index:\($0.index), yabaiIndex:\($0.yabaiIndex), type:\($0.type), display:\($0.display)]" }.joined(separator: ", "))")
-
-        if let currentActive = spaceModel.spaces.first(where: { $0.active && $0.type != .divider }) {
-            NSLog("showPanel: capturing thumbnail for space \(currentActive.index), yabaiIndex \(currentActive.yabaiIndex), display \(currentActive.display), type \(currentActive.type)")
-            captureThumbnail(for: currentActive)
-            NSLog("showPanel: capture complete")
-        } else {
-            NSLog("showPanel: WARNING - no active space found to capture (excluded divisors)")
-        }
-
         // Reset keyboard selection to active space
         resetPanelSelection()
 
@@ -491,22 +475,44 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
             if currentIndex >= columnCount {
                 newIndex = currentIndex - columnCount
             } else {
-                // Wrap to bottom row
-                let lastRowStart = ((spaces.count - 1) / columnCount) * columnCount
-                newIndex = min(lastRowStart + currentIndex, spaces.count - 1)
+                // Wrap to bottom row, same column
+                let currentCol = currentIndex % columnCount
+                // Find bottom row position for this column
+                var bottomRowColIndex = currentCol
+                while bottomRowColIndex + columnCount <= maxIndex {
+                    bottomRowColIndex += columnCount
+                }
+                newIndex = bottomRowColIndex
             }
         case 125: // Down Arrow
             let nextRow = currentIndex + columnCount
             if nextRow <= maxIndex {
                 newIndex = nextRow
             } else {
-                // Wrap to top row
-                newIndex = currentIndex % columnCount
+                // Wrap to top row, same column
+                let currentCol = currentIndex % columnCount
+                newIndex = currentCol
             }
         case 123: // Left Arrow
-            newIndex = currentIndex > 0 ? currentIndex - 1 : maxIndex
+            let currentRow = currentIndex / columnCount
+            if currentIndex % columnCount != 0 {
+                newIndex = currentIndex - 1
+            } else {
+                // Wrap to end of same row
+                let rowEnd = min((currentRow + 1) * columnCount - 1, maxIndex)
+                newIndex = rowEnd
+            }
         case 124: // Right Arrow
-            newIndex = currentIndex < maxIndex ? currentIndex + 1 : 0
+            let currentRow = currentIndex / columnCount
+            let nextIndex = currentIndex + 1
+            let rowEnd = min((currentRow + 1) * columnCount - 1, maxIndex)
+            if nextIndex <= rowEnd {
+                newIndex = nextIndex
+            } else {
+                // Wrap to start of same row
+                let rowStart = currentRow * columnCount
+                newIndex = rowStart
+            }
         case 36, 49: // Return or Space
             // Always hide panel - if different space selected, switch to it first
             let selectedSpace = spaces[currentIndex]

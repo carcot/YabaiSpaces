@@ -130,3 +130,30 @@ Added full keyboard navigation to the floating panel:
 - Escape closes panel
 - Selection highlight visible (4px accent border)
 - Selection resets to active space when panel opens
+
+## 2025-03-13: Add Wallpaper and Desktop Caching
+
+### Problem
+Panel opening had noticeable delay due to:
+1. Wallpaper file being read on every hybrid preview generation
+2. Desktop capture happening multiple times per panel open
+
+### Solution
+Added caching for wallpaper and desktop+icons images:
+
+**Wallpaper caching:**
+- `loadWallpaper()` reads wallpaper from NSWorkspace once and caches in `cachedWallpaper`
+- `captureDesktop(display:targetSize:)` returns cached wallpaper (with resizing if needed)
+
+**Desktop+icons caching:**
+- `captureAndCacheDesktopWithIcons()` captures desktop from first display once
+- `captureDesktopWithIcons(targetSize:)` returns cached desktop (with resizing if needed)
+- Used by hybrid preview for more realistic background
+
+### Files Modified
+- `PrivateWindowCapture.swift`: Added `cachedWallpaper`, `cachedDesktop`, `loadWallpaper()`, `captureDesktopWithIcons()`, `captureAndCacheDesktopWithIcons()`, `clearCaches()`
+
+### Testing
+- Panel opens faster (wallpaper read once, not per space)
+- Hybrid preview shows desktop background more accurately
+- Desktop icons included in cached background (captureDisplay() includes desktop icons)

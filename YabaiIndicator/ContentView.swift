@@ -123,19 +123,18 @@ struct ThumbnailSpaceButton : View {
                     }
                 }
                 .overlay(
-                    // Border styling: selection + active state
+                    // Border styling: selection (navigation) + active state
                     ZStack {
-                        // Selection border (outermost, bright accent - 4px for visibility)
-                        if isSelected {
-                            RoundedRectangle(cornerRadius: 0)
-                                .stroke(Color.accentColor, lineWidth: 4)
-                        }
+                        // Border: accent when active or selected, secondary gray otherwise
+                        // Thickness: 3px when active, 2px when selected inactive, 1px when inactive
+                        let isAccent = space.active || isSelected
+                        let thickness: CGFloat = space.active ? 3 : (isSelected ? 2 : 1)
 
-                        // Active state border (inside selection border)
-                        let activeInset: CGFloat = isSelected ? 4 : 0
                         RoundedRectangle(cornerRadius: 0)
-                            .inset(by: activeInset)
-                            .stroke(space.active && !isSelected ? Color.accentColor : Color.gray.opacity(0.5), lineWidth: space.active && !isSelected ? 2 : 1)
+                            .stroke(
+                                isAccent ? Color.accentColor : Color.secondary,
+                                lineWidth: thickness
+                            )
                     }
                 )
                 .onAppear {
