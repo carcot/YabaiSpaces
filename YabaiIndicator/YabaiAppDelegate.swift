@@ -83,7 +83,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     var spaceModel = SpaceModel()
 
     // Track last active space for thumbnail capture
-    private var lastActiveSpaceUUID: String? = nil
+    private var lastActiveSpaceId: UInt64 = 0
 
     let statusBarHeight: CGFloat = 22
     let itemWidth: CGFloat = 30
@@ -134,7 +134,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     // Capture thumbnail for a specific space (call when space becomes inactive)
     // Returns immediately after starting async capture
     func captureThumbnail(for space: Space) {
-        NSLog("captureThumbnail START: space \(space.index) (yabaiIndex: \(space.yabaiIndex), uuid: \(space.uuid.prefix(20)), display \(space.display))")
+        NSLog("captureThumbnail START: space \(space.index) (yabaiIndex: \(space.yabaiIndex), spaceId: \(space.spaceid), display \(space.display))")
 
         let displays = gNativeClient.queryDisplays()
         guard space.display - 1 >= 0, space.display - 1 < displays.count else {
@@ -166,10 +166,10 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
             display: display,
             targetSize: targetSize
         ) {
-            NSLog("captureThumbnail DONE: caching for uuid '\(space.uuid.prefix(20))', size: \(thumbnail.size)")
-            gThumbnailCache.set(spaceUUID: space.uuid, image: thumbnail)
+            NSLog("captureThumbnail DONE: caching for spaceId \(space.spaceid), size: \(thumbnail.size)")
+            gThumbnailCache.set(spaceId: space.spaceid, image: thumbnail)
         } else {
-            NSLog("captureThumbnail FAILED: for uuid: '\(space.uuid.prefix(20))'")
+            NSLog("captureThumbnail FAILED: for spaceId: \(space.spaceid)")
         }
     }
 

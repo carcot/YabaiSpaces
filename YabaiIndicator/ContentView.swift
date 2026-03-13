@@ -93,7 +93,7 @@ struct ThumbnailSpaceButton : View {
     var displays: [Display]
     var layout: PanelLayout = PanelLayout()
     @State private var thumbnail: NSImage?
-    @State private var thumbnailUUID: String = ""  // Track which space this thumbnail belongs to
+    @State private var thumbnailSpaceId: UInt64 = 0  // Track which space this thumbnail belongs to
 
     func switchSpace() {
         if !space.active && space.yabaiIndex > 0 {
@@ -113,8 +113,8 @@ struct ThumbnailSpaceButton : View {
                 let targetSize = CGSize(width: layout.baseImageHeight * aspect, height: layout.baseImageHeight)
 
                 Group {
-                    // Only show thumbnail if it matches current space UUID
-                    if let thumbnail = thumbnail, thumbnailUUID == space.uuid {
+                    // Only show thumbnail if it matches current space spaceid
+                    if let thumbnail = thumbnail, thumbnailSpaceId == space.spaceid {
                         Image(nsImage: thumbnail)
                     } else {
                         // Show window preview immediately
@@ -124,14 +124,14 @@ struct ThumbnailSpaceButton : View {
                 .onAppear {
                     loadThumbnail(for: space, display: display, windows: windows, size: targetSize)
                 }
-                .onChange(of: space.uuid) { _ in
+                .onChange(of: space.spaceid) { _ in
                     thumbnail = nil
-                    thumbnailUUID = ""
+                    thumbnailSpaceId = 0
                     loadThumbnail(for: space, display: display, windows: windows, size: targetSize)
                 }
                 .onChange(of: windows.count) { _ in
                     thumbnail = nil
-                    thumbnailUUID = ""
+                    thumbnailSpaceId = 0
                     loadThumbnail(for: space, display: display, windows: windows, size: targetSize)
                 }
                 .frame(width: targetSize.width, height: targetSize.height)
@@ -153,13 +153,13 @@ struct ThumbnailSpaceButton : View {
     }
 
     private func loadThumbnail(for space: Space, display: Display, windows: [Window], size: CGSize) {
-        NSLog("loadThumbnail for space \(space.index) (uuid: \(space.uuid.prefix(8)))")
+        NSLog("loadThumbnail for space \(space.index) (spaceId: \(space.spaceid))")
 
         // Check cache first
-        if let cached = gThumbnailCache.get(spaceUUID: space.uuid) {
-            NSLog("  Found cached thumbnail for uuid: \(space.uuid.prefix(8))")
+        if let cached = gThumbnailCache.get(spaceId: space.spaceid) {
+            NSLog("  Found cached thumbnail for spaceId: \(space.spaceid)")
             thumbnail = cached
-            thumbnailUUID = space.uuid  // Track which space this belongs to
+            thumbnailSpaceId = space.spaceid  // Track which space this belongs to
             return
         }
 
@@ -167,7 +167,7 @@ struct ThumbnailSpaceButton : View {
 
         // Generate preview thumbnail asynchronously
         // IMPORTANT: Do NOT cache this - it's not the actual space content, just a preview
-        let currentSpaceUUID = space.uuid
+        let targetSpaceId = space.spaceid
         DispatchQueue.global(qos: .userInitiated).async {
             let captured = gPrivateWindowCapture.captureSpace(
                 windows: windows,
@@ -177,11 +177,12 @@ struct ThumbnailSpaceButton : View {
 
             DispatchQueue.main.async {
                 if let captured = captured {
-                    // Only set if this is still for the same space (not stale)
-                    if self.space.uuid == currentSpaceUUID {
+                    // Only set if this view is still showing the same space
+                    // Check against current state, not the captured space value
+                    if self.thumbnailSpaceId == 0 || self.thumbnailSpaceId == targetSpaceId {
                         self.thumbnail = captured
-                        self.thumbnailUUID = currentSpaceUUID
-                        NSLog("  Captured preview thumbnail (NOT CACHED) for uuid: \(currentSpaceUUID.prefix(8))")
+                        self.thumbnailSpaceId = targetSpaceId
+                        NSLog("  Captured preview thumbnail (NOT CACHED) for spaceId: \(targetSpaceId)")
                     }
                     // Don't cache - wait for proper capture on space switch
                 }

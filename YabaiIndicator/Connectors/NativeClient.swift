@@ -25,23 +25,16 @@ class NativeClient {
         for (dindex, display) in displays.enumerated() {
             let displaySpaces = display["Spaces"] as? [NSDictionary] ?? []
             let current = display["Current Space"] as? NSDictionary
-            // let currentUUID = current["uuid"] as? String
-            let currentUUID = current?["uuid"] as? String ?? ""
+            let currentId64 = current?["id64"] as? UInt64 ?? 0
             let displayUUID = display["Display Identifier"] as? String ?? ""
             let activeDisplay = activeDisplayUUID == displayUUID
-            
+
             for nsSpace:NSDictionary in displaySpaces {
                 let spaceId = nsSpace["id64"] as? UInt64 ?? 0
-                let spaceUUID = nsSpace["uuid"] as? String ?? ""
+                let spaceUUID = nsSpace["uuid"] as? String ?? ""  // Kept for debug/logging only
 
-                // Debug: log when UUID is missing
-                if spaceUUID.isEmpty {
-                    NSLog("WARNING: Space has empty UUID! spaceId=\(spaceId), nsSpace keys: \(nsSpace.allKeys)")
-                }
-
-                // Fallback for spaces with empty UUID - use stable identifier based on display and space ID
-                let finalUUID = spaceUUID.isEmpty ? "fallback-d\(dindex + 1)-id\(spaceId)" : spaceUUID
-                let visible = spaceUUID == currentUUID
+                // Use spaceid (id64) for visibility comparison - stable and reliable
+                let visible = spaceId == currentId64
                 let active = visible && activeDisplay
                 let spaceType = nsSpace["type"] as? Int ?? 0
 
@@ -52,7 +45,8 @@ class NativeClient {
                     spaceIndex = spaceIncr
                 }
 
-                spaces.append(Space(spaceid: spaceId, uuid: finalUUID, visible: visible, active: active, display: dindex + 1, index: spaceIndex, yabaiIndex: totalSpaces, type: SpaceType(rawValue: spaceType) ?? SpaceType.standard))
+                // uuid is kept for compatibility but not used for caching
+                spaces.append(Space(spaceid: spaceId, uuid: spaceUUID, visible: visible, active: active, display: dindex + 1, index: spaceIndex, yabaiIndex: totalSpaces, type: SpaceType(rawValue: spaceType) ?? SpaceType.standard))
             }
         }
         return spaces
