@@ -130,3 +130,86 @@ func generateImage(active: Bool, visible: Bool, windows: [Window], display: Disp
     image.isTemplate = true
     return image
 }
+
+// MARK: - Hybrid Preview Style (Desktop + Window Outlines)
+
+/// Draw window outlines only (no fill) for hybrid preview style
+private func drawWindowOutlines(in content: NSRect, windows: [Window], display: Display) {
+    let displaySize = display.frame.size
+    let displayOrigin = display.frame.origin
+    let contentSize = content.size
+    let contentOrigin = content.origin
+
+    // Uniform scale - content aspect ratio matches display aspect ratio
+    let scale = contentSize.width / displaySize.width
+
+    // Draw each window as an outline only
+    for window in windows.reversed() {
+        let fixedOrigin = NSPoint(x: window.frame.origin.x - displayOrigin.x, y: displaySize.height - (window.frame.origin.y - displayOrigin.y + window.frame.height))
+        let windowRect = NSRect(
+            x: contentOrigin.x + fixedOrigin.x * scale,
+            y: contentOrigin.y + fixedOrigin.y * scale,
+            width: window.frame.width * scale,
+            height: window.frame.height * scale
+        )
+        let windowPath = NSBezierPath(rect: windowRect)
+
+        // Draw outline with contrasting color
+        NSColor.white.setStroke()
+        windowPath.lineWidth = 1.0
+        windowPath.stroke()
+    }
+}
+
+/// Generate a hybrid preview image with desktop background and window outlines
+/// Used for spaces without cached thumbnails
+func generateHybridPreviewImage(active: Bool, visible: Bool, windows: [Window], display: Display, scale: CGFloat = 1.0) -> NSImage {
+    // Calculate size proportional to display aspect ratio
+    let baseHeight: CGFloat = 20 * scale
+    let aspect = display.frame.width / display.frame.height
+    let size = CGSize(width: baseHeight * aspect, height: baseHeight)
+
+    let canvas = NSRect(origin: CGPoint.zero, size: size)
+
+    let image = NSImage(size: size)
+
+    image.lockFocus()
+
+    // Try to capture desktop wallpaper as background
+    let desktopCaptured = gPrivateWindowCapture.captureDesktop(display: display, targetSize: size)
+
+    if active || visible {
+        // Draw desktop wallpaper if available, otherwise use fallback color
+        if let desktop = desktopCaptured {
+            desktop.draw(in: canvas)
+        } else {
+            NSColor(red: 0.3, green: 0.35, blue: 0.45, alpha: 1.0).setFill()
+            NSBezierPath(rect: canvas).fill()
+        }
+
+        // Draw window outlines
+        drawWindowOutlines(in: canvas, windows: windows, display: display)
+    } else {
+        // Draw border outline
+        NSColor.black.setStroke()
+        let borderPath = NSBezierPath(rect: canvas.insetBy(dx: 0.5, dy: 0.5))
+        borderPath.lineWidth = 1.0
+        borderPath.stroke()
+
+        // Draw desktop wallpaper if available, otherwise use fallback color
+        if let desktop = desktopCaptured {
+            // Dim the desktop slightly for inactive state
+            desktop.draw(in: canvas.insetBy(dx: 1.0, dy: 1.0))
+        } else {
+            NSColor(red: 0.5, green: 0.5, blue: 0.55, alpha: 1.0).setFill()
+            NSBezierPath(rect: canvas.insetBy(dx: 1.0, dy: 1.0)).fill()
+        }
+
+        // Draw window outlines
+        drawWindowOutlines(in: canvas, windows: windows, display: display)
+    }
+
+    image.unlockFocus()
+    image.isTemplate = false  // Not a template - has actual colors
+    return image
+}

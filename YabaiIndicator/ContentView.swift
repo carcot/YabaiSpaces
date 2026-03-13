@@ -117,12 +117,19 @@ struct ThumbnailSpaceButton : View {
                     if let thumbnail = thumbnail, thumbnailSpaceId == space.spaceid {
                         Image(nsImage: thumbnail)
                     } else {
-                        // Show window preview immediately
-                        Image(nsImage: generateImage(active: space.active, visible: space.visible, windows: windows, display: display, scale: layout.scale))
+                        // Show hybrid preview (desktop + window outlines) for unvisited spaces
+                        Image(nsImage: generateHybridPreviewImage(active: space.active, visible: space.visible, windows: windows, display: display, scale: layout.scale))
                     }
                 }
                 .onAppear {
                     loadThumbnail(for: space, display: display, windows: windows, size: targetSize)
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .thumbnailDidCache)) { notification in
+                    // Reload thumbnail if cached for this space
+                    if let cachedSpaceId = notification.userInfo?["spaceId"] as? UInt64,
+                       cachedSpaceId == space.spaceid {
+                        loadThumbnail(for: space, display: display, windows: windows, size: targetSize)
+                    }
                 }
                 .onChange(of: space.spaceid) { _ in
                     thumbnail = nil
@@ -153,40 +160,16 @@ struct ThumbnailSpaceButton : View {
     }
 
     private func loadThumbnail(for space: Space, display: Display, windows: [Window], size: CGSize) {
-        NSLog("loadThumbnail for space \(space.index) (spaceId: \(space.spaceid))")
-
-        // Check cache first
+        // Only check cache - real thumbnails are captured on space switch in YabaiAppDelegate
+        // For spaces without cached thumbnails, the windows-style preview (desktop + outlines)
+        // shown in the body view provides the fallback appearance
         if let cached = gThumbnailCache.get(spaceId: space.spaceid) {
-            NSLog("  Found cached thumbnail for spaceId: \(space.spaceid)")
             thumbnail = cached
-            thumbnailSpaceId = space.spaceid  // Track which space this belongs to
-            return
-        }
-
-        NSLog("  No cached thumbnail, using preview windows count: \(windows.count)")
-
-        // Generate preview thumbnail asynchronously
-        // IMPORTANT: Do NOT cache this - it's not the actual space content, just a preview
-        let targetSpaceId = space.spaceid
-        DispatchQueue.global(qos: .userInitiated).async {
-            let captured = gPrivateWindowCapture.captureSpace(
-                windows: windows,
-                display: display,
-                targetSize: size
-            )
-
-            DispatchQueue.main.async {
-                if let captured = captured {
-                    // Only set if this view is still showing the same space
-                    // Check against current state, not the captured space value
-                    if self.thumbnailSpaceId == 0 || self.thumbnailSpaceId == targetSpaceId {
-                        self.thumbnail = captured
-                        self.thumbnailSpaceId = targetSpaceId
-                        NSLog("  Captured preview thumbnail (NOT CACHED) for spaceId: \(targetSpaceId)")
-                    }
-                    // Don't cache - wait for proper capture on space switch
-                }
-            }
+            thumbnailSpaceId = space.spaceid
+        } else {
+            // No cached thumbnail - let the windows-style preview show in the body
+            thumbnail = nil
+            thumbnailSpaceId = 0
         }
     }
 }

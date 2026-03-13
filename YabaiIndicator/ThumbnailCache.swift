@@ -8,6 +8,11 @@
 import Foundation
 import Cocoa
 
+// Notification posted when a thumbnail is cached
+extension Notification.Name {
+    static let thumbnailDidCache = Notification.Name("thumbnailDidCache")
+}
+
 class ThumbnailCache {
     private var cache: [UInt64: NSImage] = [:]
     private var accessOrder: [UInt64] = []
@@ -50,6 +55,13 @@ class ThumbnailCache {
             }
         }
         NSLog("Cache SET complete, cache size after: \(cache.count)")
+
+        // Post notification so views can reload
+        NotificationCenter.default.post(
+            name: .thumbnailDidCache,
+            object: nil,
+            userInfo: ["spaceId": spaceId]
+        )
     }
 
     /// Invalidate cache for a specific space

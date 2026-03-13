@@ -35,3 +35,38 @@ Two issues:
 ### Testing
 - Rapid space switching (especially spaces 9 and 12) now shows correct thumbnails
 - Cache is properly invalidated when spaces change
+
+## 2025-03-13: Add Hybrid Thumbnail Style - Desktop Wallpaper + Window Outlines
+
+### Problem
+Thumbnail style showed nothing (or poor preview) for spaces without cached thumbnails. The window-style preview was filled-in, not proper outlines, and lacked desktop backgrounds.
+
+### Solution
+
+**New hybrid preview style** for spaces without cached thumbnails:
+- Displays actual desktop wallpaper as background (read from system preferences)
+- Draws window outlines only (white strokes, no fill)
+- No rounded corners - full rectangular thumbnail area
+
+**Added notification-based cache updates**:
+- `ThumbnailCache` now posts `.thumbnailDidCache` notification when thumbnail is cached
+- `ThumbnailSpaceButton` listens for notifications and reloads when thumbnail becomes available
+- Fixes issue where active space showed outlines instead of captured thumbnail on first panel open
+
+### New Functions
+- `generateHybridPreviewImage()` in `ImageGenerator.swift`: Generates desktop wallpaper + window outlines preview
+- `drawWindowOutlines()` in `ImageGenerator.swift`: Draws window outlines only (copied from `drawWindows()`)
+- `captureDesktop()` in `PrivateWindowCapture.swift`: Captures actual desktop wallpaper from system preferences
+- `.thumbnailDidCache` notification in `ThumbnailCache.swift`: Posted when thumbnail is cached
+
+### Files Modified
+- `ContentView.swift`: Added `.onReceive()` for cache notifications, removed async preview capture
+- `ImageGenerator.swift`: Added hybrid preview generation functions
+- `PrivateWindowCapture.swift`: Added `captureDesktop()` to read wallpaper from NSWorkspace
+- `ThumbnailCache.swift`: Added notification posting when thumbnail is cached
+
+### Testing
+- First panel open: all spaces show desktop wallpaper + window outlines
+- Switching to space: real thumbnail captured and cached
+- Subsequent panel opens: visited spaces show cached thumbnails, unvisited show hybrid preview
+- Active space now immediately shows captured thumbnail (not outlines) on panel open

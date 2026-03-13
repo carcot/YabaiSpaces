@@ -128,6 +128,43 @@ class PrivateWindowCapture {
         return nil
     }
 
+    /// Capture just the desktop wallpaper for a display (no windows)
+    /// Reads the actual wallpaper image from system preferences
+    func captureDesktop(display: Display, targetSize: CGSize) -> NSImage? {
+        // Read wallpaper path from UserDefaults
+        // macOS stores desktop picture in workspace preferences
+        let workspace = NSWorkspace.shared
+
+        // Try to get desktop image URL for the specific display
+        for screen in NSScreen.screens {
+            let screenFrame = screen.frame
+            let displayFrame = display.frame
+
+            // Match by screen position
+            if abs(screenFrame.origin.x - displayFrame.origin.x) < 10 &&
+               abs(screenFrame.origin.y - displayFrame.origin.y) < 10 {
+                // Get desktop image for this screen
+                if let desktopImageURL = workspace.desktopImageURL(for: screen) {
+                    if let desktopImage = NSImage(contentsOf: desktopImageURL) {
+                        // Scale to target size
+                        let scaled = NSImage(size: targetSize)
+                        scaled.lockFocus()
+                        desktopImage.draw(
+                            in: NSRect(origin: .zero, size: targetSize),
+                            from: NSRect(origin: .zero, size: desktopImage.size),
+                            operation: .copy,
+                            fraction: 1.0
+                        )
+                        scaled.unlockFocus()
+                        return scaled
+                    }
+                }
+            }
+        }
+
+        return nil
+    }
+
     /// Capture all windows for a space and composite them
     func captureSpace(windows: [Window], display: Display, targetSize: CGSize) -> NSImage? {
         captureQueue.sync {
