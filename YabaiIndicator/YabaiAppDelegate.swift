@@ -18,7 +18,7 @@ class GlobalHotkey {
     func register(keyCode: UInt32, modifiers: UInt32, handler: @escaping () -> Void) -> Bool {
         self.handler = handler
 
-        var hotkeyID = EventHotKeyID(signature: OSType(0x59494920), id: 1) // 'YI ' + 1
+        let hotkeyID = EventHotKeyID(signature: OSType(0x59494920), id: 1) // 'YI ' + 1
 
         let status = RegisterEventHotKey(
             keyCode,
@@ -79,6 +79,9 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     let itemWidth: CGFloat = 30
     let panelPadding: CGFloat = 8
 
+    // Panel layout - scale calculated from screen height
+    var panelLayout: PanelLayout = PanelLayout()
+
     var sinks: [AnyCancellable?] = []
     var receiverQueue = DispatchQueue(label: "yabai-indicator.socket.receiver")
     var eventMonitors: [Any] = []
@@ -105,13 +108,13 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     func onSpaceRefresh() {
         let displays = gNativeClient.queryDisplays()
         let spaceElems = gNativeClient.querySpaces()
-        
+
         DispatchQueue.main.async {
             self.spaceModel.displays = displays
             self.spaceModel.spaces = spaceElems
         }
     }
-    
+
     func onWindowRefresh() {
         if UserDefaults.standard.buttonStyle == .windows {
             let windows = gYabaiClient.queryWindows()
@@ -139,8 +142,9 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func createFloatingPanel() {
+        let panelSize = panelLayout.panelSize
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 145, height: 90),
+            contentRect: NSRect(x: 0, y: 0, width: panelSize.width, height: panelSize.height),
             styleMask: [.nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -192,13 +196,13 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
             lastDisplay = space.display
         }
 
-        // Grid layout: 4 columns, each 32px wide with 2px spacing
-        let columns = 4
-        let columnWidth: CGFloat = 32
-        let columnSpacing: CGFloat = 2
-        let buttonHeight: CGFloat = 20
-        let rowSpacing: CGFloat = 4
-        let padding: CGFloat = 4
+        // Grid layout from PanelLayout
+        let columns = panelLayout.columnCount
+        let columnWidth = panelLayout.columnWidth
+        let columnSpacing = panelLayout.columnSpacing
+        let buttonHeight = panelLayout.buttonHeight
+        let rowSpacing = panelLayout.rowSpacing
+        let padding = panelLayout.padding
 
         let row = activeGridIndex / columns
         let col = activeGridIndex % columns
@@ -469,6 +473,20 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         refreshData()
     }
 
+    func updatePanelLayout() {
+        let screenHeight = NSScreen.main?.frame.height ?? 1080
+        panelLayout = PanelLayout(scale: PanelLayout.scale(from: screenHeight))
+
+        // Save to UserDefaults so PanelContentView can read it
+        panelLayout.save()
+
+        // Always create or recreate panel with new size
+        if floatingPanel != nil {
+            floatingPanel?.close()
+        }
+        createFloatingPanel()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let prefs = Bundle.main.path(forResource: "defaults", ofType: "plist"),
             let dict = NSDictionary(contentsOfFile: prefs) as? [String : Any] {
@@ -490,8 +508,8 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         // Create status bar item (for menu access)
         statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
-        // Create floating panel
-        createFloatingPanel()
+        // Calculate panel layout from screen height
+        updatePanelLayout()
 
         // Set up triple-click monitor
         setupTripleClickMonitor()

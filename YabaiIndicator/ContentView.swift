@@ -15,6 +15,7 @@ var appDelegate: YabaiAppDelegate {
 
 struct SpaceButton : View {
     var space: Space
+    var layout: PanelLayout = PanelLayout()
     
     func getText() -> String {
         switch space.type {
@@ -37,9 +38,9 @@ struct SpaceButton : View {
         if space.type == .divider {
             Divider().background(Color(.systemGray)).frame(height: 14)
         } else {
-            Image(nsImage: generateImage(symbol: getText() as NSString, active: space.active, visible: space.visible)).onTapGesture {
+            Image(nsImage: generateImage(symbol: getText() as NSString, active: space.active, visible: space.visible, scale: layout.scale)).onTapGesture {
                 switchSpace()
-            }.frame(width:28, height: 20)
+            }.frame(width: layout.imageSize.width, height: layout.imageSize.height)
         }
     }
 }
@@ -48,6 +49,7 @@ struct WindowSpaceButton : View {
     var space: Space
     var windows: [Window]
     var displays: [Display]
+    var layout: PanelLayout = PanelLayout()
 
     func switchSpace() {
         if !space.active && space.yabaiIndex > 0 {
@@ -61,21 +63,21 @@ struct WindowSpaceButton : View {
             // Safely get display, fallback to a default Display if index is invalid
             let displayIndex = space.display - 1
             if displayIndex >= 0 && displayIndex < displays.count {
-                Image(nsImage: generateImage(active: space.active, visible: space.visible, windows: windows, display: displays[displayIndex])).onTapGesture {
+                Image(nsImage: generateImage(active: space.active, visible: space.visible, windows: windows, display: displays[displayIndex], scale: layout.scale)).onTapGesture {
                     switchSpace()
-                }.frame(width:28, height: 20)
+                }.frame(width: layout.imageSize.width, height: layout.imageSize.height)
             } else {
                 // Fallback to numeric style if display data is invalid
-                Image(nsImage: generateImage(symbol: "\(space.index)" as NSString, active: space.active, visible: space.visible)).onTapGesture {
+                Image(nsImage: generateImage(symbol: "\(space.index)" as NSString, active: space.active, visible: space.visible, scale: layout.scale)).onTapGesture {
                     switchSpace()
-                }.frame(width:28, height: 20)
+                }.frame(width: layout.imageSize.width, height: layout.imageSize.height)
             }
         case .fullscreen:
-            Image(nsImage: generateImage(symbol: "F" as NSString, active: space.active, visible: space.visible)).onTapGesture {
+            Image(nsImage: generateImage(symbol: "F" as NSString, active: space.active, visible: space.visible, scale: layout.scale)).onTapGesture {
                 switchSpace()
-            }
+            }.frame(width: layout.imageSize.width, height: layout.imageSize.height)
         case .divider:
-            Divider().background(Color(.systemGray)).frame(height: 14)
+            Divider().background(Color(.systemGray)).frame(height: layout.dividerHeight)
         }
     }
 }
@@ -86,12 +88,7 @@ struct ContentView: View {
     @AppStorage("showCurrentSpaceOnly") private var showCurrentSpaceOnly = false
     @AppStorage("buttonStyle") private var buttonStyle: ButtonStyle = .numeric
 
-    let columns = [
-        GridItem(.fixed(32), spacing: 2),
-        GridItem(.fixed(32), spacing: 2),
-        GridItem(.fixed(32), spacing: 2),
-        GridItem(.fixed(32), spacing: 2)
-    ]
+    var layout: PanelLayout { PanelLayout(from: UserDefaults.standard) }
 
     private func generateSpaces() -> [Space] {
         var shownSpaces:[Space] = []
@@ -111,18 +108,18 @@ struct ContentView: View {
     }
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 4) {
+        LazyVGrid(columns: layout.columns, spacing: layout.rowSpacing) {
             if buttonStyle == .numeric || spaceModel.displays.count > 0 {
                 ForEach(generateSpaces(), id: \.self) {space in
                     switch buttonStyle {
                     case .numeric:
-                        SpaceButton(space: space)
+                        SpaceButton(space: space, layout: layout)
                     case .windows:
-                        WindowSpaceButton(space: space, windows: spaceModel.windows.filter{$0.spaceIndex == space.yabaiIndex}, displays: spaceModel.displays)
+                        WindowSpaceButton(space: space, windows: spaceModel.windows.filter{$0.spaceIndex == space.yabaiIndex}, displays: spaceModel.displays, layout: layout)
                     }
                 }
             }
-        }.padding(4)
+        }.padding(layout.padding)
     }
 }
 
@@ -159,12 +156,7 @@ struct PanelContentView: View {
     @AppStorage("showDisplaySeparator") private var showDisplaySeparator = true
     @AppStorage("showCurrentSpaceOnly") private var showCurrentSpaceOnly = false
 
-    let columns = [
-        GridItem(.fixed(32), spacing: 2),
-        GridItem(.fixed(32), spacing: 2),
-        GridItem(.fixed(32), spacing: 2),
-        GridItem(.fixed(32), spacing: 2)
-    ]
+    var layout: PanelLayout { PanelLayout(from: UserDefaults.standard) }
 
     private func generateSpaces() -> [Space] {
         var shownSpaces:[Space] = []
@@ -184,19 +176,19 @@ struct PanelContentView: View {
     }
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 4) {
+        LazyVGrid(columns: layout.columns, spacing: layout.rowSpacing) {
             if buttonStyle == .numeric || spaceModel.displays.count > 0 {
                 ForEach(generateSpaces(), id: \.self) {space in
                     switch buttonStyle {
                     case .numeric:
-                        SpaceButton(space: space)
+                        SpaceButton(space: space, layout: layout)
                     case .windows:
-                        WindowSpaceButton(space: space, windows: spaceModel.windows.filter{$0.spaceIndex == space.yabaiIndex}, displays: spaceModel.displays)
+                        WindowSpaceButton(space: space, windows: spaceModel.windows.filter{$0.spaceIndex == space.yabaiIndex}, displays: spaceModel.displays, layout: layout)
                     }
                 }
             }
         }
-        .padding(4)
+        .padding(layout.padding)
         .contextMenu {
             Button("Preferences...") {
                 NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)

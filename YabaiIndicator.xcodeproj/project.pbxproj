@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		50PL00022779210000E8F192 /* PanelLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50PL00012779210000E8F192 /* PanelLayout.swift */; };
 		500F41362780826500C6BC9B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 500F41352780826500C6BC9B /* SettingsView.swift */; };
 		5051A4692780C02700614C85 /* YabaiClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5051A4682780C02700614C85 /* YabaiClient.swift */; };
 		5051A46B2780DC9B00614C85 /* defaults.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5051A46A2780DC9B00614C85 /* defaults.plist */; };
@@ -51,6 +52,7 @@
 
 /* Begin PBXFileReference section */
 		500F41352780826500C6BC9B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		50PL00012779210000E8F192 /* PanelLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelLayout.swift; sourceTree = "<group>"; };
 		5051A4682780C02700614C85 /* YabaiClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YabaiClient.swift; sourceTree = "<group>"; };
 		5051A46A2780DC9B00614C85 /* defaults.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = defaults.plist; sourceTree = "<group>"; };
 		506120682779212000E8F192 /* YabaiIndicator.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = YabaiIndicator.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -148,6 +150,7 @@
 				5061206B2779212000E8F192 /* YabaiIndicatorApp.swift */,
 				5061206D2779212000E8F192 /* ContentView.swift */,
 				50DF24C6277BD18700DF1906 /* ImageGenerator.swift */,
+				50PL00012779210000E8F192 /* PanelLayout.swift */,
 				5061206F2779212200E8F192 /* Assets.xcassets */,
 				506120742779212200E8F192 /* YabaiIndicator.entitlements */,
 				506120712779212200E8F192 /* Preview Content */,
@@ -358,6 +361,7 @@
 				506120AF277A7BF800E8F192 /* SpacesModel.swift in Sources */,
 				5086FE87278303EE00E51F61 /* NativeClient.swift in Sources */,
 				50DF24C7277BD18700DF1906 /* ImageGenerator.swift in Sources */,
+				50PL00022779210000E8F192 /* PanelLayout.swift in Sources */,
 				5086FE892783598E00E51F61 /* SpaceType.swift in Sources */,
 				506120982779239B00E8F192 /* YabaiAppDelegate.swift in Sources */,
 				500F41362780826500C6BC9B /* SettingsView.swift in Sources */,
