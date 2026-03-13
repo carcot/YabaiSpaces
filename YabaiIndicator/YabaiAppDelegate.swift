@@ -15,10 +15,10 @@ class GlobalHotkey {
     private var hotkeyRef: EventHotKeyRef?
     private var handler: (() -> Void)?
 
-    func register(keyCode: UInt32, modifiers: UInt32, handler: @escaping () -> Void) -> Bool {
+    func register(keyCode: UInt32, modifiers: UInt32, id: UInt32 = 1, handler: @escaping () -> Void) -> Bool {
         self.handler = handler
 
-        var hotkeyID = EventHotKeyID(signature: OSType(0x59494920), id: 1) // 'YI ' + 1
+        var hotkeyID = EventHotKeyID(signature: OSType(0x59494920), id: id) // 'YI ' + unique id
 
         let status = RegisterEventHotKey(
             keyCode,
@@ -337,7 +337,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         let hotkey = GlobalHotkey()
         // KeyCode 49 = Space, modifiers: cmdKey = 256 (0x100), optionKey = 2048 (0x800)
         let modifiers: UInt32 = UInt32(cmdKey | optionKey)
-        let success = hotkey.register(keyCode: 49, modifiers: modifiers) { [weak self] in
+        let success = hotkey.register(keyCode: 49, modifiers: modifiers, id: 1) { [weak self] in
             self?.togglePanel(at: NSEvent.mouseLocation)
         }
 
@@ -347,8 +347,8 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
 
         // Set up Escape key handler to hide the panel
         let escapeHotkey = GlobalHotkey()
-        // KeyCode 53 = Escape, no modifiers (0)
-        let escapeSuccess = escapeHotkey.register(keyCode: 53, modifiers: 0) { [weak self] in
+        // KeyCode 53 = Escape, no modifiers (0), use id: 2 to avoid conflict
+        let escapeSuccess = escapeHotkey.register(keyCode: 53, modifiers: 0, id: 2) { [weak self] in
             self?.hidePanel()
         }
         if escapeSuccess {
