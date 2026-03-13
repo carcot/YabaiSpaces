@@ -52,6 +52,49 @@ class GlobalHotkey {
     }
 }
 
+// Global key handler using Carbon (for keys like Escape that need to work globally)
+class GlobalKeyHandler {
+    private var handlerRef: EventHandlerRef?
+    private var keyCode: UInt32
+    private var handler: () -> Void
+
+    init(keyCode: UInt32, handler: @escaping () -> Void) {
+        self.keyCode = keyCode
+        self.handler = handler
+    }
+
+    func start() -> Bool {
+        var eventSpec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventRawKeyDown))
+
+        let selfPtr = Unmanaged.passRetained(self).toOpaque()
+
+        let status = InstallEventHandler(GetApplicationEventTarget(), { (nextHandler, theEvent, userData) -> OSStatus in
+            if let userData = userData {
+                let keyHandler = Unmanaged<GlobalKeyHandler>.fromOpaque(userData).takeUnretainedValue()
+
+                // Get the key code from the event
+                var keyCode: UInt32 = 0
+                GetEventParameter(theEvent, EventParamName(kEventParamKeyCode), EventParamType(typeUInt32), nil, MemoryLayout<UInt32>.size, nil, &keyCode)
+
+                if keyCode == keyHandler.keyCode {
+                    keyHandler.handler()
+                    return noErr  // Consume the event
+                }
+            }
+            return CallNextEventHandler(nextHandler, theEvent)
+        }, 1, &eventSpec, selfPtr, &handlerRef)
+
+        return status == noErr
+    }
+
+    func stop() {
+        if let ref = handlerRef {
+            RemoveEventHandler(ref)
+            handlerRef = nil
+        }
+    }
+}
+
 extension UserDefaults {
     @objc dynamic var showDisplaySeparator: Bool {
         return bool(forKey: "showDisplaySeparator")
@@ -83,6 +126,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     var receiverQueue = DispatchQueue(label: "yabai-indicator.socket.receiver")
     var eventMonitors: [Any] = []
     var globalHotkey: GlobalHotkey?
+    var escapeKeyHandler: GlobalKeyHandler?
 
     @objc
     func onSpaceChanged(_ notification: Notification) {
@@ -325,7 +369,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func setupTripleClickMonitor() {
-                // Use Carbon for reliable global hotkey
+        // Use Carbon for reliable global hotkey
         let hotkey = GlobalHotkey()
         // KeyCode 49 = Space, modifiers: cmdKey = 256 (0x100), optionKey = 2048 (0x800)
         let modifiers: UInt32 = UInt32(cmdKey | optionKey)
@@ -335,6 +379,14 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
 
         if success {
             globalHotkey = hotkey
+        }
+
+        // Set up Escape key handler to hide the panel
+        let escapeHandler = GlobalKeyHandler(keyCode: 53) { [weak self] in  // KeyCode 53 = Escape
+            self?.hidePanel()
+        }
+        if escapeHandler.start() {
+            escapeKeyHandler = escapeHandler
         }
     }
 
