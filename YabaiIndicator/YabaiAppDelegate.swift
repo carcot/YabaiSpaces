@@ -50,47 +50,11 @@ class GlobalHotkey {
 
         return true
     }
-}
 
-// Global key handler using Carbon (for keys like Escape that need to work globally)
-class GlobalKeyHandler {
-    private var handlerRef: EventHandlerRef?
-    private var keyCode: UInt32
-    private var handler: () -> Void
-
-    init(keyCode: UInt32, handler: @escaping () -> Void) {
-        self.keyCode = keyCode
-        self.handler = handler
-    }
-
-    func start() -> Bool {
-        var eventSpec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventRawKeyDown))
-
-        let selfPtr = Unmanaged.passRetained(self).toOpaque()
-
-        let status = InstallEventHandler(GetApplicationEventTarget(), { (nextHandler, theEvent, userData) -> OSStatus in
-            if let userData = userData {
-                let keyHandler = Unmanaged<GlobalKeyHandler>.fromOpaque(userData).takeUnretainedValue()
-
-                // Get the key code from the event
-                var keyCode: UInt32 = 0
-                GetEventParameter(theEvent, EventParamName(kEventParamKeyCode), EventParamType(typeUInt32), nil, MemoryLayout<UInt32>.size, nil, &keyCode)
-
-                if keyCode == keyHandler.keyCode {
-                    keyHandler.handler()
-                    return noErr  // Consume the event
-                }
-            }
-            return CallNextEventHandler(nextHandler, theEvent)
-        }, 1, &eventSpec, selfPtr, &handlerRef)
-
-        return status == noErr
-    }
-
-    func stop() {
-        if let ref = handlerRef {
-            RemoveEventHandler(ref)
-            handlerRef = nil
+    func unregister() {
+        if let ref = hotkeyRef {
+            UnregisterEventHotKey(ref)
+            hotkeyRef = nil
         }
     }
 }
@@ -126,7 +90,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     var receiverQueue = DispatchQueue(label: "yabai-indicator.socket.receiver")
     var eventMonitors: [Any] = []
     var globalHotkey: GlobalHotkey?
-    var escapeKeyHandler: GlobalKeyHandler?
+    var escapeHotkey: GlobalHotkey?
 
     @objc
     func onSpaceChanged(_ notification: Notification) {
@@ -382,11 +346,13 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // Set up Escape key handler to hide the panel
-        let escapeHandler = GlobalKeyHandler(keyCode: 53) { [weak self] in  // KeyCode 53 = Escape
+        let escapeHotkey = GlobalHotkey()
+        // KeyCode 53 = Escape, no modifiers (0)
+        let escapeSuccess = escapeHotkey.register(keyCode: 53, modifiers: 0) { [weak self] in
             self?.hidePanel()
         }
-        if escapeHandler.start() {
-            escapeKeyHandler = escapeHandler
+        if escapeSuccess {
+            self.escapeHotkey = escapeHotkey
         }
     }
 
