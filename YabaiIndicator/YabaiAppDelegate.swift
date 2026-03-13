@@ -20,12 +20,9 @@ class KeyPanel: NSPanel {
 // Global hotkey using Carbon
 class GlobalHotkey {
     private var hotkeyRef: EventHotKeyRef?
-    private var handler: (() -> Void)?
 
-    func register(keyCode: UInt32, modifiers: UInt32, handler: @escaping () -> Void) -> Bool {
-        self.handler = handler
-
-        let hotkeyID = EventHotKeyID(signature: OSType(0x59494920), id: 1) // 'YI ' + 1
+    func register(keyCode: UInt32, modifiers: UInt32, id: UInt32 = 1) -> Bool {
+        let hotkeyID = EventHotKeyID(signature: OSType(0x59494920), id: id) // 'YI ' + id
 
         let status = RegisterEventHotKey(
             keyCode,
@@ -37,25 +34,65 @@ class GlobalHotkey {
         )
 
         if status != noErr {
-            NSLog("Failed to register hotkey: \(status)")
+            NSLog("Failed to register hotkey \(id): \(status)")
             return false
         }
 
-        // Install event handler
+        NSLog("Registered hotkey \(id): keyCode=\(keyCode), modifiers=\(modifiers)")
+        return true
+    }
+}
+
+// Global hotkey event dispatcher - single handler for all hotkeys
+class HotkeyEventDispatcher {
+    static let shared = HotkeyEventDispatcher()
+    private var handlers: [UInt32: () -> Void] = [:]
+    private var eventHandlerRef: EventHandlerRef?
+
+    private init() {
+        setupEventHandler()
+    }
+
+    func setHandler(id: UInt32, handler: @escaping () -> Void) {
+        handlers[id] = handler
+    }
+
+    private func setupEventHandler() {
         var mySpec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        var handlerRef: EventHandlerRef?
 
         let selfPtr = Unmanaged.passRetained(self).toOpaque()
 
         InstallEventHandler(GetApplicationEventTarget(), { (nextHandler, theEvent, userData) -> OSStatus in
             if let userData = userData {
-                let hotkey = Unmanaged<GlobalHotkey>.fromOpaque(userData).takeUnretainedValue()
-                hotkey.handler?()
+                let dispatcher = Unmanaged<HotkeyEventDispatcher>.fromOpaque(userData).takeUnretainedValue()
+                return dispatcher.handleEvent(theEvent)
             }
             return noErr
-        }, 1, &mySpec, selfPtr, &handlerRef)
+        }, 1, &mySpec, selfPtr, &eventHandlerRef)
+    }
 
-        return true
+    private func handleEvent(_ event: EventRef?) -> OSStatus {
+        guard let event = event else { return noErr }
+
+        var hotkeyID = EventHotKeyID()
+        let status = GetEventParameter(
+            event,
+            EventParamName(kEventParamDirectObject),
+            EventParamType(typeEventHotKeyID),
+            nil,
+            MemoryLayout<EventHotKeyID>.size,
+            nil,
+            &hotkeyID
+        )
+
+        if status == noErr {
+            NSLog("Hotkey pressed: id=\(hotkeyID.id)")
+            if let handler = handlers[hotkeyID.id] {
+                handler()
+            }
+        }
+
+        return noErr
     }
 }
 
@@ -96,6 +133,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     var receiverQueue = DispatchQueue(label: "yabai-indicator.socket.receiver")
     var eventMonitors: [Any] = []
     var globalHotkey: GlobalHotkey?
+    var centeredHotkey: GlobalHotkey?
 
     @objc
     func onSpaceChanged(_ notification: Notification) {
@@ -307,6 +345,26 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         // NSApp.activate(ignoringOtherApps: true)
 
         // Start monitoring for clicks outside
+        startClickOutsideMonitor()
+    }
+
+    func showPanelCentered() {
+        guard let panel = floatingPanel else { return }
+        guard let screen = NSScreen.main else { return }
+
+        let panelSize = panel.frame.size
+        let visibleFrame = screen.visibleFrame
+
+        // Center panel in visible frame
+        let x = visibleFrame.midX - panelSize.width / 2
+        let y = visibleFrame.midY - panelSize.height / 2
+
+        panel.setFrameOrigin(NSPoint(x: x, y: y))
+
+        resetPanelSelection()
+        panel.orderFrontRegardless()
+        panel.makeKey()
+
         startClickOutsideMonitor()
     }
 
@@ -549,17 +607,27 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         eventMonitors.removeAll()
     }
 
-    func setupTripleClickMonitor() {
-        // Use Carbon for reliable global hotkey
+    func setupGlobalHotkeys() {
+        // Cmd+Option+Space hotkey - panel at mouse position
         let hotkey = GlobalHotkey()
         // KeyCode 49 = Space, modifiers: cmdKey = 256 (0x100), optionKey = 2048 (0x800)
         let modifiers: UInt32 = UInt32(cmdKey | optionKey)
-        let success = hotkey.register(keyCode: 49, modifiers: modifiers) { [weak self] in
-            self?.togglePanel(at: NSEvent.mouseLocation)
+        if hotkey.register(keyCode: 49, modifiers: modifiers, id: 1) {
+            globalHotkey = hotkey
+            HotkeyEventDispatcher.shared.setHandler(id: 1) { [weak self] in
+                self?.togglePanel(at: NSEvent.mouseLocation)
+            }
         }
 
-        if success {
-            globalHotkey = hotkey
+        // Cmd+Option+Ctrl+Space hotkey - centered panel
+        let centeredHotkey = GlobalHotkey()
+        // KeyCode 49 = Space, modifiers: cmdKey | optionKey | controlKey
+        let centeredModifiers: UInt32 = UInt32(cmdKey | optionKey | controlKey)
+        if centeredHotkey.register(keyCode: 49, modifiers: centeredModifiers, id: 2) {
+            self.centeredHotkey = centeredHotkey
+            HotkeyEventDispatcher.shared.setHandler(id: 2) { [weak self] in
+                self?.showPanelCentered()
+            }
         }
     }
 
@@ -770,8 +838,8 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         // Create status bar item (for menu access)
         statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
-        // Set up triple-click monitor
-        setupTripleClickMonitor()
+        // Set up global hotkeys
+        setupGlobalHotkeys()
 
         refreshButtonStyle()
         registerObservers()
