@@ -208,8 +208,28 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         let buttonCenterY = panelSize.height - (padding + CGFloat(row) * (buttonHeight + rowSpacing) + buttonHeight / 2)
 
         // Position panel so mouse is over the active space button
-        let newX = mouseLocation.x - buttonCenterX
-        let newY = mouseLocation.y - buttonCenterY
+        var newX = mouseLocation.x - buttonCenterX
+        var newY = mouseLocation.y - buttonCenterY
+
+        // Keep panel on screen - get the screen containing the mouse
+        if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) ?? NSScreen.main {
+            let visibleFrame = screen.visibleFrame
+            let panelFrame = NSRect(x: newX, y: newY, width: panelSize.width, height: panelSize.height)
+
+            // Adjust horizontally if off screen
+            if panelFrame.minX < visibleFrame.minX {
+                newX = visibleFrame.minX
+            } else if panelFrame.maxX > visibleFrame.maxX {
+                newX = visibleFrame.maxX - panelSize.width
+            }
+
+            // Adjust vertically if off screen
+            if panelFrame.minY < visibleFrame.minY {
+                newY = visibleFrame.minY
+            } else if panelFrame.maxY > visibleFrame.maxY {
+                newY = visibleFrame.maxY - panelSize.height
+            }
+        }
 
         panel.setFrameOrigin(NSPoint(x: newX, y: newY))
         panel.orderFrontRegardless()
