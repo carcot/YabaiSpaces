@@ -344,7 +344,8 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if panel.isVisible {
-            hidePanel()
+            // Move panel to new location instead of hiding
+            showPanel(at: mouseLocation)
         } else {
             showPanel(at: mouseLocation)
         }
