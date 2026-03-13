@@ -10,6 +10,13 @@ import Socket
 import Combine
 import Carbon
 
+// Custom panel that can become key window even with nonactivating style
+class KeyPanel: NSPanel {
+    override var canBecomeKey: Bool {
+        return true
+    }
+}
+
 // Global hotkey using Carbon
 class GlobalHotkey {
     private var hotkeyRef: EventHotKeyRef?
@@ -75,6 +82,9 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     var application: NSApplication = NSApplication.shared
     var spaceModel = SpaceModel()
 
+    // Track last active space for thumbnail capture
+    private var lastActiveSpaceUUID: String? = nil
+
     let statusBarHeight: CGFloat = 22
     let itemWidth: CGFloat = 30
     let panelPadding: CGFloat = 8
@@ -109,14 +119,63 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         let displays = gNativeClient.queryDisplays()
         let spaceElems = gNativeClient.querySpaces()
 
+        // NOTE: Thumbnail capture is now only done in switchSpace() to avoid duplicates
+        // onSpaceRefresh() is called AFTER space switch, so we'd be capturing wrong state
+
+        // NOTE: Don't clear cache on every refresh - thumbnails should persist
+        // Only clear when spaces are actually reconfigured (not just switching)
+
         DispatchQueue.main.async {
             self.spaceModel.displays = displays
             self.spaceModel.spaces = spaceElems
         }
     }
 
+    // Capture thumbnail for a specific space (call when space becomes inactive)
+    // Returns immediately after starting async capture
+    func captureThumbnail(for space: Space) {
+        NSLog("captureThumbnail START: space \(space.index) (yabaiIndex: \(space.yabaiIndex), uuid: \(space.uuid.prefix(20)), display \(space.display))")
+
+        let displays = gNativeClient.queryDisplays()
+        guard space.display - 1 >= 0, space.display - 1 < displays.count else {
+            NSLog("  ERROR: invalid display index \(space.display - 1), displays.count: \(displays.count)")
+            return
+        }
+        let display = displays[space.display - 1]
+        NSLog("  Display frame: \(display.frame)")
+
+        // CRITICAL: Query windows synchronously BEFORE space switch
+        let windows = gYabaiClient.queryWindows()
+        let spaceWindows = windows.filter { $0.spaceIndex == space.yabaiIndex }
+
+        NSLog("  Total windows from yabai: \(windows.count)")
+        NSLog("  Windows filtered for yabaiIndex \(space.yabaiIndex): \(spaceWindows.count)")
+        for w in spaceWindows.prefix(5) {  // Log first 5 windows
+            NSLog("    - window: \(w.title.prefix(30)) [id: \(w.id), space: \(w.spaceIndex), display: \(w.displayIndex)]")
+        }
+
+        // Capture SYNCHRONOUSLY so cache is updated before we return
+        // This ensures the new space's view will find the cached thumbnail
+        // Calculate thumbnail size proportional to display aspect ratio
+        let baseHeight: CGFloat = 20 * panelLayout.scale
+        let aspect = display.frame.width / display.frame.height
+        let targetSize = CGSize(width: baseHeight * aspect, height: baseHeight)
+
+        if let thumbnail = gPrivateWindowCapture.captureSpace(
+            windows: spaceWindows,
+            display: display,
+            targetSize: targetSize
+        ) {
+            NSLog("captureThumbnail DONE: caching for uuid '\(space.uuid.prefix(20))', size: \(thumbnail.size)")
+            gThumbnailCache.set(spaceUUID: space.uuid, image: thumbnail)
+        } else {
+            NSLog("captureThumbnail FAILED: for uuid: '\(space.uuid.prefix(20))'")
+        }
+    }
+
     func onWindowRefresh() {
-        if UserDefaults.standard.buttonStyle == .windows {
+        let buttonStyle = UserDefaults.standard.buttonStyle
+        if buttonStyle == .windows || buttonStyle == .thumbnail {
             let windows = gYabaiClient.queryWindows()
             DispatchQueue.main.async {
                 self.spaceModel.windows = windows
@@ -143,7 +202,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
 
     func createFloatingPanel() {
         let panelSize = panelLayout.panelSize
-        let panel = NSPanel(
+        let panel = KeyPanel(
             contentRect: NSRect(x: 0, y: 0, width: panelSize.width, height: panelSize.height),
             styleMask: [.nonactivatingPanel],
             backing: .buffered,
@@ -155,6 +214,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         panel.isOpaque = false
         panel.hasShadow = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.becomesKeyOnlyIfNeeded = false
 
         let hostingView = NSHostingView(rootView: PanelContentView().environmentObject(spaceModel))
         hostingView.wantsLayer = true
@@ -236,7 +296,25 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         }
 
         panel.setFrameOrigin(NSPoint(x: newX, y: newY))
+
+        // Capture thumbnail of current active space BEFORE showing panel
+        // (panel not visible yet, so it won't be in screenshot)
+        // Capture ANY active space, not just .standard type
+
+        // Debug: log all active spaces and their types
+        let activeSpaces = spaceModel.spaces.filter { $0.active }
+        NSLog("showPanel: active spaces: \(activeSpaces.map { "[index:\($0.index), yabaiIndex:\($0.yabaiIndex), type:\($0.type), display:\($0.display)]" }.joined(separator: ", "))")
+
+        if let currentActive = spaceModel.spaces.first(where: { $0.active && $0.type != .divider }) {
+            NSLog("showPanel: capturing thumbnail for space \(currentActive.index), yabaiIndex \(currentActive.yabaiIndex), display \(currentActive.display), type \(currentActive.type)")
+            captureThumbnail(for: currentActive)
+            NSLog("showPanel: capture complete")
+        } else {
+            NSLog("showPanel: WARNING - no active space found to capture (excluded divisors)")
+        }
+
         panel.orderFrontRegardless()
+        panel.makeKey()
 
         // Don't activate the app - it interferes with other windows like Settings
         // NSApp.activate(ignoringOtherApps: true)
@@ -251,11 +329,17 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func startClickOutsideMonitor() {
+        NSLog("startClickOutsideMonitor: setting up event monitors")
         stopClickOutsideMonitor() // Remove any existing monitor
 
-        // Local monitor for clicks within our app
+        // Local monitor for clicks within our app - ONLY for panel interactions
         let localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            NSLog("Local click: button=\(event.buttonNumber), location=\(event.locationInWindow)")
+            // Only intercept clicks if panel is visible
+            guard let panel = self?.floatingPanel, panel.isVisible else {
+                return event  // Let all other clicks pass through normally
+            }
+
+            NSLog("Local click (panel visible): button=\(event.buttonNumber), location=\(event.locationInWindow)")
             // Right-click (button=1 on macOS) shows menu
             if event.buttonNumber == 1 {
                 NSLog("Right-click detected, showing menu")
@@ -269,13 +353,28 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
             return event
         }
 
-        // Local monitor for Escape key to hide panel
+        // Local monitor for Escape key to hide panel - ONLY when panel is visible
         let keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            // Only handle Escape if panel is visible
+            guard let panel = self?.floatingPanel, panel.isVisible else {
+                return event  // Let Escape pass through normally
+            }
+            NSLog("Local keyDown: keyCode=\(event.keyCode), panel.visible=\(panel.isVisible)")
             if event.keyCode == 53 {  // 53 = Escape
+                NSLog("Escape pressed (local), hiding panel")
                 self?.hidePanel()
                 return nil  // Consume the event
             }
             return event
+        }
+
+        // Global monitor for Escape key - needed because panel is non-activating
+        let globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            NSLog("Global keyDown: keyCode=\(event.keyCode)")
+            if event.keyCode == 53 {  // 53 = Escape
+                NSLog("Escape pressed (global), hiding panel")
+                self?.hidePanel()
+            }
         }
 
         // Global monitor for clicks in other apps - hide on any click
@@ -286,7 +385,9 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
 
         if let local = localMonitor { eventMonitors.append(local) }
         if let key = keyMonitor { eventMonitors.append(key) }
+        if let globalKey = globalKeyMonitor { eventMonitors.append(globalKey) }
         if let global = globalMonitor { eventMonitors.append(global) }
+        NSLog("startClickOutsideMonitor: \(eventMonitors.count) monitors registered")
     }
 
     func showPanelMenu(at location: NSPoint) {
@@ -327,7 +428,12 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     @objc
     func toggleButtonStyle() {
         let currentStyle = UserDefaults.standard.buttonStyle
-        let newStyle: ButtonStyle = currentStyle == .numeric ? .windows : .numeric
+        let newStyle: ButtonStyle
+        switch currentStyle {
+        case .numeric: newStyle = .windows
+        case .windows: newStyle = .thumbnail
+        case .thumbnail: newStyle = .numeric
+        }
         UserDefaults.standard.set(newStyle.rawValue, forKey: "buttonStyle")
     }
 
@@ -377,13 +483,11 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
                 if msg == "refresh" {
                     self.refreshData()
                 } else if msg == "refresh spaces" {
-                    receiverQueue.async {
-                        // log("Refreshing on main thread")
+                    Task { @MainActor in
                         self.onSpaceRefresh()
                     }
                 } else if msg == "refresh windows" {
-                    receiverQueue.async {
-                        // log("Refreshing on main thread")
+                    Task { @MainActor in
                         self.onWindowRefresh()
                     }
                 }
@@ -456,7 +560,45 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(self.onSpaceChanged(_:)), name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(self.onDisplayChanged(_:)), name: Notification.Name("NSWorkspaceActiveDisplayDidChangeNotification"), object: nil)
     }
-    
+
+    // Switch spaces
+    func switchSpace(to yabaiIndex: Int) {
+        // Perform the space switch
+        NSLog("switchSpace: calling focusSpace(\(yabaiIndex))")
+        gYabaiClient.focusSpace(index: yabaiIndex)
+
+        // Hide panel after switch
+        hidePanel()
+
+        // Capture thumbnail of the NEW space after switching (panel is now hidden)
+        // Small delay to ensure Yabai has completed the switch
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self = self else { return }
+
+            // Query spaces SYNCHRONOUSLY to get updated active flags
+            // (refreshData is async and won't complete in time)
+            let spaceElems = gNativeClient.querySpaces()
+            DispatchQueue.main.async {
+                self.spaceModel.spaces = spaceElems
+            }
+
+            // Debug: log all active spaces
+            let activeSpaces = spaceElems.filter { $0.active }
+            NSLog("switchSpace async: active spaces after switch: \(activeSpaces.map { "[index:\($0.index), yabaiIndex:\($0.yabaiIndex), type:\($0.type)]" }.joined(separator: ", "))")
+
+            // Find space by yabaiIndex - capture even if 'active' flag isn't set correctly
+            // (macOS sometimes misreports active status, especially for spaces with empty UUIDs)
+            if let newActive = spaceElems.first(where: { $0.yabaiIndex == yabaiIndex }) {
+                NSLog("switchSpace: capturing thumbnail for space \(newActive.index) (yabaiIndex: \(newActive.yabaiIndex), active: \(newActive.active))")
+                self.captureThumbnail(for: newActive)
+            } else {
+                NSLog("switchSpace: WARNING - no space found with yabaiIndex \(yabaiIndex)")
+                // Log all spaces with their yabaiIndex for debugging
+                NSLog("switchSpace: all spaces: \(spaceElems.map { "[index:\($0.index), yabaiIndex:\($0.yabaiIndex), active:\($0.active)]" }.joined(separator: ", "))")
+            }
+        }
+    }
+
     func refreshButtonStyle() {
         // PanelContentView uses @AppStorage so it updates automatically - no need to replace contentView
 
@@ -470,15 +612,25 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         statusBarView.setFrameSize(NSSize(width: 60, height: statusBarHeight))
         statusBarItem?.button?.addSubview(statusBarView)
 
+        // Always clear cache when button style changes - thumbnails will be captured on space switch
+        gThumbnailCache.clear()
+
         refreshData()
     }
 
     func updatePanelLayout() {
         let screenHeight = NSScreen.main?.frame.height ?? 1080
-        panelLayout = PanelLayout(scale: PanelLayout.scale(from: screenHeight))
+        let baseScale = PanelLayout.scale(from: screenHeight)
+        // Always use 3x scale for floating panel
+        panelLayout = PanelLayout(scale: baseScale * 3)
+
+        // Clear thumbnail cache so new size is used
+        gThumbnailCache.clear()
 
         // Save to UserDefaults so PanelContentView can read it
         panelLayout.save()
+
+        NSLog("PanelLayout updated: scale=\(panelLayout.scale), baseScale=\(baseScale)")
 
         // Always create or recreate panel with new size
         if floatingPanel != nil {
@@ -501,15 +653,17 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
 
         ]
 
-        Task {
-            await self.socketServer()
+        // Calculate panel layout FIRST (before any views are created)
+        // This ensures UserDefaults has the correct scale before views read it
+        updatePanelLayout()
+
+        // Run socket server in background - suppress Sendable warning as this is intentional
+        Task.detached(priority: .background) { [weak self] in
+            await self?.socketServer()
         }
 
         // Create status bar item (for menu access)
         statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-
-        // Calculate panel layout from screen height
-        updatePanelLayout()
 
         // Set up triple-click monitor
         setupTripleClickMonitor()

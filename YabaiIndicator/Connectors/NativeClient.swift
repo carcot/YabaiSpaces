@@ -33,18 +33,26 @@ class NativeClient {
             for nsSpace:NSDictionary in displaySpaces {
                 let spaceId = nsSpace["id64"] as? UInt64 ?? 0
                 let spaceUUID = nsSpace["uuid"] as? String ?? ""
+
+                // Debug: log when UUID is missing
+                if spaceUUID.isEmpty {
+                    NSLog("WARNING: Space has empty UUID! spaceId=\(spaceId), nsSpace keys: \(nsSpace.allKeys)")
+                }
+
+                // Fallback for spaces with empty UUID - use stable identifier based on display and space ID
+                let finalUUID = spaceUUID.isEmpty ? "fallback-d\(dindex + 1)-id\(spaceId)" : spaceUUID
                 let visible = spaceUUID == currentUUID
                 let active = visible && activeDisplay
                 let spaceType = nsSpace["type"] as? Int ?? 0
-                
+
                 var spaceIndex = 0
                 totalSpaces += 1
                 if spaceType == 0 {
                     spaceIncr += 1
                     spaceIndex = spaceIncr
                 }
-                
-                spaces.append(Space(spaceid: spaceId, uuid: spaceUUID, visible: visible, active: active, display: dindex + 1, index: spaceIndex, yabaiIndex: totalSpaces, type: SpaceType(rawValue: spaceType) ?? SpaceType.standard))
+
+                spaces.append(Space(spaceid: spaceId, uuid: finalUUID, visible: visible, active: active, display: dindex + 1, index: spaceIndex, yabaiIndex: totalSpaces, type: SpaceType(rawValue: spaceType) ?? SpaceType.standard))
             }
         }
         return spaces

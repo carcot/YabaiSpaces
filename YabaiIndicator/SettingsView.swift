@@ -26,6 +26,7 @@ struct SettingsView : View {
                 Picker("Button Style", selection: $buttonStyle) {
                     Text("Numeric").tag(ButtonStyle.numeric)
                     Text("Windows").tag(ButtonStyle.windows)
+                    Text("Thumbnail").tag(ButtonStyle.thumbnail)
                 }
             }.padding(10)
                 .tabItem {

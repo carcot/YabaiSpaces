@@ -9,8 +9,9 @@ import SwiftUI
 import AppKit
 
 // Reference to app delegate for accessing panel
+// Note: Use gAppDelegate instead of NSApp.delegate due to SwiftUI App lifecycle wrapping
 var appDelegate: YabaiAppDelegate {
-    return NSApp.delegate as! YabaiAppDelegate
+    return gAppDelegate
 }
 
 struct SpaceButton : View {
@@ -63,9 +64,13 @@ struct WindowSpaceButton : View {
             // Safely get display, fallback to a default Display if index is invalid
             let displayIndex = space.display - 1
             if displayIndex >= 0 && displayIndex < displays.count {
-                Image(nsImage: generateImage(active: space.active, visible: space.visible, windows: windows, display: displays[displayIndex], scale: layout.scale)).onTapGesture {
+                let display = displays[displayIndex]
+                // Calculate frame size proportional to display aspect ratio
+                let aspect = display.frame.width / display.frame.height
+                let frameSize = CGSize(width: layout.baseImageHeight * aspect, height: layout.baseImageHeight)
+                Image(nsImage: generateImage(active: space.active, visible: space.visible, windows: windows, display: display, scale: layout.scale)).onTapGesture {
                     switchSpace()
-                }.frame(width: layout.imageSize.width, height: layout.imageSize.height)
+                }.frame(width: frameSize.width, height: frameSize.height)
             } else {
                 // Fallback to numeric style if display data is invalid
                 Image(nsImage: generateImage(symbol: "\(space.index)" as NSString, active: space.active, visible: space.visible, scale: layout.scale)).onTapGesture {
@@ -78,6 +83,109 @@ struct WindowSpaceButton : View {
             }.frame(width: layout.imageSize.width, height: layout.imageSize.height)
         case .divider:
             Divider().background(Color(.systemGray)).frame(height: layout.dividerHeight)
+        }
+    }
+}
+
+struct ThumbnailSpaceButton : View {
+    var space: Space
+    var windows: [Window]
+    var displays: [Display]
+    var layout: PanelLayout = PanelLayout()
+    @State private var thumbnail: NSImage?
+    @State private var thumbnailUUID: String = ""  // Track which space this thumbnail belongs to
+
+    func switchSpace() {
+        if !space.active && space.yabaiIndex > 0 {
+            appDelegate.switchSpace(to: space.yabaiIndex)
+        }
+    }
+
+    var body: some View {
+        switch space.type {
+        case .standard:
+            let displayIndex = space.display - 1
+
+            if displayIndex >= 0 && displayIndex < displays.count {
+                let display = displays[displayIndex]
+                // Calculate thumbnail size proportional to display aspect ratio
+                let aspect = display.frame.width / display.frame.height
+                let targetSize = CGSize(width: layout.baseImageHeight * aspect, height: layout.baseImageHeight)
+
+                Group {
+                    // Only show thumbnail if it matches current space UUID
+                    if let thumbnail = thumbnail, thumbnailUUID == space.uuid {
+                        Image(nsImage: thumbnail)
+                    } else {
+                        // Show window preview immediately
+                        Image(nsImage: generateImage(active: space.active, visible: space.visible, windows: windows, display: display, scale: layout.scale))
+                    }
+                }
+                .onAppear {
+                    loadThumbnail(for: space, display: display, windows: windows, size: targetSize)
+                }
+                .onChange(of: space.uuid) { _ in
+                    thumbnail = nil
+                    thumbnailUUID = ""
+                    loadThumbnail(for: space, display: display, windows: windows, size: targetSize)
+                }
+                .onChange(of: windows.count) { _ in
+                    thumbnail = nil
+                    thumbnailUUID = ""
+                    loadThumbnail(for: space, display: display, windows: windows, size: targetSize)
+                }
+                .frame(width: targetSize.width, height: targetSize.height)
+                .onTapGesture { switchSpace() }
+            } else {
+                Image(nsImage: generateImage(active: space.active, visible: space.visible, windows: windows, display: displays[0], scale: layout.scale))
+                    .onTapGesture { switchSpace() }
+                    .frame(width: layout.imageSize.width, height: layout.imageSize.height)
+            }
+
+        case .fullscreen:
+            Image(nsImage: generateImage(symbol: "F" as NSString, active: space.active, visible: space.visible, scale: layout.scale))
+                .onTapGesture { switchSpace() }
+                .frame(width: layout.imageSize.width, height: layout.imageSize.height)
+
+        case .divider:
+            Divider().background(Color(.systemGray)).frame(height: layout.dividerHeight)
+        }
+    }
+
+    private func loadThumbnail(for space: Space, display: Display, windows: [Window], size: CGSize) {
+        NSLog("loadThumbnail for space \(space.index) (uuid: \(space.uuid.prefix(8)))")
+
+        // Check cache first
+        if let cached = gThumbnailCache.get(spaceUUID: space.uuid) {
+            NSLog("  Found cached thumbnail for uuid: \(space.uuid.prefix(8))")
+            thumbnail = cached
+            thumbnailUUID = space.uuid  // Track which space this belongs to
+            return
+        }
+
+        NSLog("  No cached thumbnail, using preview windows count: \(windows.count)")
+
+        // Generate preview thumbnail asynchronously
+        // IMPORTANT: Do NOT cache this - it's not the actual space content, just a preview
+        let currentSpaceUUID = space.uuid
+        DispatchQueue.global(qos: .userInitiated).async {
+            let captured = gPrivateWindowCapture.captureSpace(
+                windows: windows,
+                display: display,
+                targetSize: size
+            )
+
+            DispatchQueue.main.async {
+                if let captured = captured {
+                    // Only set if this is still for the same space (not stale)
+                    if self.space.uuid == currentSpaceUUID {
+                        self.thumbnail = captured
+                        self.thumbnailUUID = currentSpaceUUID
+                        NSLog("  Captured preview thumbnail (NOT CACHED) for uuid: \(currentSpaceUUID.prefix(8))")
+                    }
+                    // Don't cache - wait for proper capture on space switch
+                }
+            }
         }
     }
 }
@@ -116,6 +224,8 @@ struct ContentView: View {
                         SpaceButton(space: space, layout: layout)
                     case .windows:
                         WindowSpaceButton(space: space, windows: spaceModel.windows.filter{$0.spaceIndex == space.yabaiIndex}, displays: spaceModel.displays, layout: layout)
+                    case .thumbnail:
+                        ThumbnailSpaceButton(space: space, windows: spaceModel.windows.filter{$0.spaceIndex == space.yabaiIndex}, displays: spaceModel.displays, layout: layout)
                     }
                 }
             }
@@ -184,6 +294,8 @@ struct PanelContentView: View {
                         SpaceButton(space: space, layout: layout)
                     case .windows:
                         WindowSpaceButton(space: space, windows: spaceModel.windows.filter{$0.spaceIndex == space.yabaiIndex}, displays: spaceModel.displays, layout: layout)
+                    case .thumbnail:
+                        ThumbnailSpaceButton(space: space, windows: spaceModel.windows.filter{$0.spaceIndex == space.yabaiIndex}, displays: spaceModel.displays, layout: layout)
                     }
                 }
             }
@@ -196,7 +308,12 @@ struct PanelContentView: View {
             }
             Button("Toggle Button Style") {
                 let currentStyle = UserDefaults.standard.buttonStyle
-                let newStyle: ButtonStyle = currentStyle == .numeric ? .windows : .numeric
+                let newStyle: ButtonStyle
+                switch currentStyle {
+                case .numeric: newStyle = .windows
+                case .windows: newStyle = .thumbnail
+                case .thumbnail: newStyle = .numeric
+                }
                 UserDefaults.standard.set(newStyle.rawValue, forKey: "buttonStyle")
             }
             Divider()

@@ -7,13 +7,17 @@
 
 import SwiftUI
 
+// Global reference to app delegate for access from SwiftUI views
+var gAppDelegate: YabaiAppDelegate!
+
 @main
 struct YabaiIndicatorApp: App {
     @NSApplicationDelegateAdaptor(YabaiAppDelegate.self) var appDelegate
-    
-    
+
+
     init() {
-        // Customize delegate here.
+        // Set global reference for access from views
+        gAppDelegate = appDelegate
     }
     
     var body: some Scene {

@@ -31,10 +31,13 @@ extern CFArrayRef SLSCopyManagedDisplays(int cid);
 extern CFStringRef SLSCopyActiveMenuBarDisplayIdentifier(int cid);
 extern CFStringRef SLSGetDisplayBounds(int did);
 
+// Private window capture APIs
+extern CGImageRef _CGWindowListCreateImage(CGRect screenBounds, CFArrayRef windowList, uint32_t imageOption);
+extern CGImageRef _CGWindowListCreateImageFromRect(CGRect screenBounds, CFArrayRef windowList, uint32_t imageOption, CGRect rect);
 
 #define kCGSModalWindowTagBit           (1 << 31)
 #define kCGSDisableShadowTagBit         (1 <<  3)
-#define kCGSHighQualityResamplingTagBit (1 <<  4)
+#define kCGSHighqualityResamplingTagBit (1 <<  4)
 #define kCGSIgnoreForExposeTagBit       (1 <<  7)
 #define kCGSStickyTagBit                (1 << 11)
 

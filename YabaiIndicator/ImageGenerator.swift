@@ -61,20 +61,19 @@ func drawWindows(in content: NSRect, windows: [Window], display: Display) {
     let displayOrigin = display.frame.origin
     let contentSize = content.size
     let contentOrigin = content.origin
-    let scaling = displaySize.height > displaySize.width ? displaySize.height / contentSize.height : displaySize.width / contentSize.width
-    let xoffset = (displaySize.height > displaySize.width ? (contentSize.width - displaySize.width / scaling) / 2 : 0) + contentOrigin.x
-    let yoffset = (displaySize.height > displaySize.width ? 0 : (contentSize.height - displaySize.height / scaling) / 2) + contentOrigin.y
-    
-    let scalingFactor = 1/scaling
-    let transform = NSAffineTransform()
-    transform.scale(by: scalingFactor)
-    transform.translateX(by: xoffset / scalingFactor, yBy: yoffset / scalingFactor)
+
+    // Uniform scale - content aspect ratio now matches display aspect ratio
+    let scale = contentSize.width / displaySize.width
+
     // plot single windows
     for window in windows.reversed() {
         let fixedOrigin = NSPoint(x: window.frame.origin.x - displayOrigin.x, y: displaySize.height - (window.frame.origin.y - displayOrigin.y + window.frame.height))
-        let windowOrigin = transform.transform(fixedOrigin)
-        let windowSize = transform.transform(window.frame.size)
-        let windowRect = NSRect(origin: windowOrigin, size: windowSize)
+        let windowRect = NSRect(
+            x: contentOrigin.x + fixedOrigin.x * scale,
+            y: contentOrigin.y + fixedOrigin.y * scale,
+            width: window.frame.width * scale,
+            height: window.frame.height * scale
+        )
         let windowPath = NSBezierPath(rect: windowRect)
         windowPath.fill()
         NSGraphicsContext.saveGraphicsState()
@@ -86,15 +85,19 @@ func drawWindows(in content: NSRect, windows: [Window], display: Display) {
 }
 
 func generateImage(active: Bool, visible: Bool, windows: [Window], display: Display, scale: CGFloat = 1.0) -> NSImage {
-    let size = CGSize(width: 28 * scale, height: 20 * scale)
+    // Calculate size proportional to display aspect ratio
+    let baseHeight: CGFloat = 20 * scale
+    let aspect = display.frame.width / display.frame.height
+    let size = CGSize(width: baseHeight * aspect, height: baseHeight)
+
     let canvas = NSRect(origin: CGPoint.zero, size: size)
     let bounds = NSBezierPath(rect: canvas.insetBy(dx: 4 * scale, dy: 4 * scale))
     let cornerRadius: CGFloat = 6 * scale
-    
-    
+
+
     let image = NSImage(size: size)
     let strokeColor = NSColor.black
-    
+
     if active || visible{
         let imageFill = NSImage(size: size)
         let imageStroke = NSImage(size: size)
@@ -103,14 +106,14 @@ func generateImage(active: Bool, visible: Bool, windows: [Window], display: Disp
         strokeColor.setFill()
         NSBezierPath(roundedRect: canvas, xRadius: cornerRadius, yRadius: cornerRadius).fill()
         imageFill.unlockFocus()
-        
+
         imageStroke.lockFocus()
         drawWindows(in: canvas, windows: windows, display: display)
         imageStroke.unlockFocus()
-        
+
         image.lockFocus()
         imageFill.draw(in: canvas, from: NSZeroRect, operation: .sourceOut, fraction: active ? 1.0 : 0.8)
-        
+
         bounds.setClip()
         imageStroke.draw(in: canvas, from: NSZeroRect, operation: .destinationOut, fraction: active ? 1.0 : 0.8)
         image.unlockFocus()

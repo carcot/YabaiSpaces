@@ -53,8 +53,10 @@ struct PanelLayout {
     var padding: CGFloat { 4 * scale }
 
     // MARK: - Image Generation
+    var baseImageHeight: CGFloat { 20 * scale }
+
     var imageSize: CGSize {
-        CGSize(width: 28 * scale, height: 20 * scale)
+        CGSize(width: 28 * scale, height: baseImageHeight)
     }
 
     var imageCornerRadius: CGFloat { 6 * scale }
