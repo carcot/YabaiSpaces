@@ -161,8 +161,8 @@ private func drawWindowOutlines(in content: NSRect, windows: [Window], display: 
     }
 }
 
-/// Generate a hybrid preview image with desktop background and window outlines
-/// Uses cached desktop+icons wallpaper, then draws window outlines on top
+/// Generate a hybrid preview image with desktop wallpaper and window outlines
+/// Uses cached wallpaper (no app windows), then draws window outlines on top
 /// Used for spaces without cached thumbnails
 func generateHybridPreviewImage(active: Bool, visible: Bool, windows: [Window], display: Display, scale: CGFloat = 1.0) -> NSImage {
     // Calculate size proportional to display aspect ratio
@@ -176,18 +176,13 @@ func generateHybridPreviewImage(active: Bool, visible: Bool, windows: [Window], 
 
     image.lockFocus()
 
-    // Try to get cached desktop+icons image (includes wallpaper and desktop icons)
-    if let desktop = gPrivateWindowCapture.captureDesktopWithIcons(targetSize: size) {
-        desktop.draw(in: canvas)
+    // Draw cached wallpaper as background
+    if let wallpaper = gPrivateWindowCapture.captureDesktop(display: display, targetSize: size) {
+        wallpaper.draw(in: canvas)
     } else {
-        // Fallback to wallpaper-only if desktop+icons capture failed
-        if let wallpaper = gPrivateWindowCapture.captureDesktop(display: display, targetSize: size) {
-            wallpaper.draw(in: canvas)
-        } else {
-            // Final fallback: solid color
-            NSColor(red: 0.3, green: 0.35, blue: 0.45, alpha: 1.0).setFill()
-            NSBezierPath(rect: canvas).fill()
-        }
+        // Fallback: solid color
+        NSColor(red: 0.3, green: 0.35, blue: 0.45, alpha: 1.0).setFill()
+        NSBezierPath(rect: canvas).fill()
     }
 
     // Draw window outlines

@@ -18,7 +18,6 @@ class PrivateWindowCapture {
 
     // Cached desktop images
     private var cachedWallpaper: NSImage?
-    private var cachedDesktop: NSImage?
     private var cacheVersion = 0  // Increment to invalidate caches
 
     // Private API function pointers
@@ -160,36 +159,9 @@ class PrivateWindowCapture {
         return loadWallpaper(targetSize: targetSize)
     }
 
-    /// Capture desktop with icons for use in hybrid preview
-    /// Uses cached desktop+icons if available
-    func captureDesktopWithIcons(targetSize: CGSize) -> NSImage? {
-        // Return cached desktop+icons if available
-        if let desktop = cachedDesktop {
-            if desktop.size == targetSize {
-                return desktop
-            } else {
-                // Resize
-                let scaled = NSImage(size: targetSize)
-                scaled.lockFocus()
-                desktop.draw(
-                    in: NSRect(origin: .zero, size: targetSize),
-                    from: NSRect(origin: .zero, size: desktop.size),
-                    operation: .copy,
-                    fraction: 1.0
-                )
-                scaled.unlockFocus()
-                return scaled
-            }
-        }
-
-        // Cache miss - capture from first display
-        return captureAndCacheDesktopWithIcons(targetSize: targetSize)
-    }
-
     /// Clear caches (call when wallpaper changes or to free memory)
     func clearCaches() {
         cachedWallpaper = nil
-        cachedDesktop = nil
         cacheVersion += 1
     }
 
@@ -215,29 +187,6 @@ class PrivateWindowCapture {
                 cachedWallpaper = scaled
                 return scaled
             }
-        }
-
-        return nil
-    }
-
-    private func captureAndCacheDesktopWithIcons(targetSize: CGSize) -> NSImage? {
-        // Capture from first available display
-        var displayCount: UInt32 = 0
-        guard CGGetActiveDisplayList(32, nil, &displayCount) == .success, displayCount > 0 else {
-            return nil
-        }
-
-        var displayIDs = [CGDirectDisplayID](repeating: 0, count: Int(displayCount))
-        guard CGGetActiveDisplayList(32, &displayIDs, &displayCount) == .success else {
-            return nil
-        }
-
-        // Try to capture from first display (includes desktop + windows)
-        // This will show desktop + icons + any app windows as background
-        if let displayID = displayIDs.first, let cgImage = captureDisplay(displayID: displayID, targetSize: targetSize) {
-            let nsImage = NSImage(cgImage: cgImage, size: targetSize)
-            cachedDesktop = nsImage
-            return nsImage
         }
 
         return nil

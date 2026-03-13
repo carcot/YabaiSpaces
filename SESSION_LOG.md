@@ -157,3 +157,27 @@ Added caching for wallpaper and desktop+icons images:
 - Panel opens faster (wallpaper read once, not per space)
 - Hybrid preview shows desktop background more accurately
 - Desktop icons included in cached background (captureDisplay() includes desktop icons)
+
+## 2025-03-13: Fix Hybrid Preview - Use Wallpaper Only
+
+### Problem
+Hybrid preview was capturing actual screen content including app windows. Every space showed the same screenshot of the current screen, making spaces indistinguishable.
+
+### Root Cause
+`captureDesktopWithIcons()` used `CGWindowListCreateImage` with nil window array, which captures the entire screen including all app windows. This was called for every space, resulting in identical thumbnails.
+
+### Solution
+Removed screen capture path entirely. Hybrid preview now:
+- Uses cached wallpaper only (read once from NSWorkspace, cached in `cachedWallpaper`)
+- Draws window outlines on top using Yabai window data
+- No app windows in background
+- Each space looks unique based on window layout from Yabai
+
+### Files Modified
+- `ImageGenerator.swift`: Removed `captureDesktopWithIcons()` call, simplified to use only cached wallpaper
+- `PrivateWindowCapture.swift`: Removed unused `captureDesktopWithIcons()` function and `cachedDesktop` variable
+
+### Testing
+- Panel opens fast (wallpaper cached)
+- Each space shows unique window outlines from Yabai data
+- No app windows visible in background
