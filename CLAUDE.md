@@ -38,7 +38,9 @@ open YabaiIndicator.xcodeproj
 **Entry Point & App Lifecycle**
 - `YabaiIndicatorApp.swift` - SwiftUI `@main` app struct, delegates to `YabaiAppDelegate`
 - `YabaiAppDelegate.swift` - Main application delegate, manages:
-  - NSStatusItem (menu bar icon)
+  - NSStatusItem (menu bar icon) for Preferences/Quit menu
+  - Floating panel that appears on hotkey (Option+Command+Space) for on-demand space switching
+  - Global hotkey using Carbon RegisterEventHotKey for reliable system-wide hotkey
   - Socket server for receiving refresh commands from Yabai
   - Observers for space/display change notifications
   - Combine publishers for reactive UI updates
@@ -88,8 +90,19 @@ UserDefaults (registered via `defaults.plist`):
 - `showCurrentSpaceOnly` - Hide inactive spaces
 - `buttonStyle` - Numeric vs window preview mode
 
+### Floating Panel Feature
+
+**Hotkey**: Option+Command+Space shows/hides a floating panel at mouse position
+
+- Panel displays space indicators and can be used to switch spaces
+- Clicking any space button switches to that space
+- Any click (inside or outside panel) hides the panel after a brief delay
+- Implemented using Carbon RegisterEventHotKey for reliable global hotkey support
+- Works even when app is not frontmost (requires Accessibility permissions)
+
 ### Key Dependencies
 
 - **BlueSocket** (Swift Package) - Socket server for receiving Yabai signals
 - **SkyLight.framework** (private) - Display/space queries
-- **Cocoa/AppKit** - NSStatusItem, NSImage, menu bar integration
+- **Carbon.framework** - Global hotkey registration
+- **Cocoa/AppKit** - NSStatusItem, NSImage, NSPanel, menu bar integration

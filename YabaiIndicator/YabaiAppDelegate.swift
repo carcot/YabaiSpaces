@@ -8,31 +8,7 @@
 import SwiftUI
 import Socket
 import Combine
-import os.log
 import Carbon
-
-// File logger for debugging - write to file so we can debug after panel closes
-let logger = OSLog(subsystem: "de.arsbrevis.YabaiIndicator", category: "Main")
-
-func log(_ message: String) {
-    os_log("%{public}@", log: logger, type: .info, message)
-    // Also write to file for easier access
-    if let logURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("yabai_indicator.txt") {
-        let timestamp = ISO8601DateFormatter().string(from: Date())
-        let logMessage = "\(timestamp) - \(message)\n"
-        if let data = logMessage.data(using: .utf8) {
-            if FileManager.default.fileExists(atPath: logURL.path) {
-                if let handle = try? FileHandle(forWritingTo: logURL) {
-                    handle.seekToEndOfFile()
-                    handle.write(data)
-                    handle.closeFile()
-                }
-            } else {
-                try? data.write(to: logURL)
-            }
-        }
-    }
-}
 
 // Global hotkey using Carbon
 class GlobalHotkey {
@@ -54,11 +30,9 @@ class GlobalHotkey {
         )
 
         if status != noErr {
-            log("Failed to register hotkey: \(status)")
+            NSLog("Failed to register hotkey: \(status)")
             return false
         }
-
-        log("Hotkey registered successfully")
 
         // Install event handler
         var mySpec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
@@ -67,14 +41,9 @@ class GlobalHotkey {
         let selfPtr = Unmanaged.passRetained(self).toOpaque()
 
         InstallEventHandler(GetApplicationEventTarget(), { (nextHandler, theEvent, userData) -> OSStatus in
-            log("=== Hotkey event received! ===")
             if let userData = userData {
                 let hotkey = Unmanaged<GlobalHotkey>.fromOpaque(userData).takeUnretainedValue()
-                log("Calling handler...")
                 hotkey.handler?()
-                log("Handler called")
-            } else {
-                log("ERROR: userData is nil!")
             }
             return noErr
         }, 1, &mySpec, selfPtr, &handlerRef)
@@ -112,7 +81,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     var sinks: [AnyCancellable?] = []
     var receiverQueue = DispatchQueue(label: "yabai-indicator.socket.receiver")
     var eventMonitors: [Any] = []
-    var hotkeyMonitors: [Any] = []
     var globalHotkey: GlobalHotkey?
 
     @objc
@@ -196,7 +164,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     func showPanel(at mouseLocation: NSPoint) {
         guard let panel = floatingPanel else { return }
 
-        log("showPanel at: \(mouseLocation)")
 
         // Calculate panel position centered on mouse
         let panelSize = panel.frame.size
@@ -208,12 +175,10 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
 
         // Start monitoring for clicks outside
-        log("Starting click monitors...")
         startClickOutsideMonitor()
     }
 
     func hidePanel() {
-        log("hidePanel called")
         floatingPanel?.orderOut(nil)
         stopClickOutsideMonitor()
     }
@@ -223,7 +188,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
 
         // Local monitor for clicks within our app (including panel buttons)
         let localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
-            log("Local click, hiding after delay")
             // Let the click pass through first, then hide
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 self?.hidePanel()
@@ -233,17 +197,14 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
 
         // Global monitor for clicks in other apps
         let globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
-            log("Global click, hiding panel")
             self?.hidePanel()
         }
 
         if let local = localMonitor { eventMonitors.append(local) }
         if let global = globalMonitor { eventMonitors.append(global) }
-        log("Click monitors started: local=\(localMonitor != nil), global=\(globalMonitor != nil)")
     }
 
     func stopClickOutsideMonitor() {
-        log("Stopping click monitors, removing \(eventMonitors.count) monitors")
         for monitor in eventMonitors {
             NSEvent.removeMonitor(monitor)
         }
@@ -251,39 +212,27 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func setupTripleClickMonitor() {
-        log("setupTripleClickMonitor called")
-
-        // Use Carbon for reliable global hotkey
+                // Use Carbon for reliable global hotkey
         let hotkey = GlobalHotkey()
         // KeyCode 49 = Space, modifiers: cmdKey = 256 (0x100), optionKey = 2048 (0x800)
         let modifiers: UInt32 = UInt32(cmdKey | optionKey)
         let success = hotkey.register(keyCode: 49, modifiers: modifiers) { [weak self] in
-            log("Carbon hotkey triggered!")
             self?.togglePanel(at: NSEvent.mouseLocation)
         }
 
         if success {
             globalHotkey = hotkey
-            log("Carbon hotkey registered successfully")
-        } else {
-            log("Failed to register Carbon hotkey, falling back to NSEvent")
         }
     }
 
     func togglePanel(at mouseLocation: NSPoint) {
-        log("=== togglePanel called at: \(mouseLocation) ===")
-        log("Panel exists: \(floatingPanel != nil)")
-        log("Panel visible: \(floatingPanel?.isVisible ?? false)")
         guard let panel = floatingPanel else {
-            log("ERROR: No panel exists!")
             return
         }
 
         if panel.isVisible {
-            log("Panel visible, hiding")
             hidePanel()
         } else {
-            log("Panel not visible, showing")
             // Force the panel to be ordered out first to reset state
             panel.orderOut(nil)
             showPanel(at: mouseLocation)
@@ -314,9 +263,9 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         } catch {
-            log("SocketServer Error: \(error)")
+            NSLog("SocketServer Error: \(error)")
         }
-        log("SocketServer Ended")
+        NSLog("SocketServer Ended")
     }
     
     @objc
