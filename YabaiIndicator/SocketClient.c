@@ -104,8 +104,13 @@ int send_message(int argc, char** argv, char** response) {
         rsp[bytes_read] = '\0';
         
         // increase result size
-        if (result_size - total_bytes_read < bytes_read) {
+        if (result_size - total_bytes_read < bytes_read + 1) {
             char *temp = malloc(result_size + BUFSIZ);
+            if (!temp) {
+                // Allocation failed - return what we have
+                result = EXIT_FAILURE;
+                break;
+            }
             memcpy(temp, *response, total_bytes_read+1);
             free(*response);
             *response = temp;

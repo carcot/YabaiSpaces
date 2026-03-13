@@ -70,6 +70,7 @@ extension UserDefaults {
 
 class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     var floatingPanel: NSPanel?
+    var settingsWindow: NSWindow?
     var statusBarItem: NSStatusItem?
     var application: NSApplication = NSApplication.shared
     var spaceModel = SpaceModel()
@@ -132,15 +133,14 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         }
         newWidth += panelPadding * 2
 
+        // Update status bar width (floating panel has fixed size)
         statusBarItem?.button?.frame.size.width = newWidth
         statusBarItem?.button?.subviews[0].frame.size.width = newWidth
-
-        floatingPanel?.setContentSize(NSSize(width: newWidth, height: statusBarHeight + panelPadding * 2))
     }
 
     func createFloatingPanel() {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 50),
+            contentRect: NSRect(x: 0, y: 0, width: 145, height: 90),
             styleMask: [.nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -152,7 +152,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         panel.hasShadow = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
-        let hostingView = NSHostingView(rootView: ContentView().environmentObject(spaceModel))
+        let hostingView = NSHostingView(rootView: PanelContentView().environmentObject(spaceModel))
         hostingView.wantsLayer = true
         hostingView.layer?.cornerRadius = 6
         hostingView.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.95).cgColor
@@ -164,7 +164,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     func showPanel(at mouseLocation: NSPoint) {
         guard let panel = floatingPanel else { return }
 
-
         // Calculate panel position centered on mouse
         let panelSize = panel.frame.size
         let newX = mouseLocation.x - panelSize.width / 2
@@ -172,7 +171,9 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
 
         panel.setFrameOrigin(NSPoint(x: newX, y: newY))
         panel.orderFrontRegardless()
-        NSApp.activate(ignoringOtherApps: true)
+
+        // Don't activate the app - it interferes with other windows like Settings
+        // NSApp.activate(ignoringOtherApps: true)
 
         // Start monitoring for clicks outside
         startClickOutsideMonitor()
@@ -186,22 +187,72 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     func startClickOutsideMonitor() {
         stopClickOutsideMonitor() // Remove any existing monitor
 
-        // Local monitor for clicks within our app (including panel buttons)
-        let localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
-            // Let the click pass through first, then hide
+        // Local monitor for clicks within our app
+        let localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            NSLog("Local click: button=\(event.buttonNumber), location=\(event.locationInWindow)")
+            // Right-click (button=1 on macOS) shows menu
+            if event.buttonNumber == 1 {
+                NSLog("Right-click detected, showing menu")
+                self?.showPanelMenu(at: event.locationInWindow)
+                return nil  // Consume right-click
+            }
+            // Left-click: let the click pass through first, then hide
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 self?.hidePanel()
             }
             return event
         }
 
-        // Global monitor for clicks in other apps
+        // Global monitor for clicks in other apps - hide on any click
+        // Note: This may cause benign Mach port warnings in logs when accessing events from other processes
         let globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
             self?.hidePanel()
         }
 
         if let local = localMonitor { eventMonitors.append(local) }
         if let global = globalMonitor { eventMonitors.append(global) }
+    }
+
+    func showPanelMenu(at location: NSPoint) {
+        let menu = NSMenu()
+
+        let prefsItem = NSMenuItem(
+            title: "Preferences...",
+            action: #selector(openPreferences),
+            keyEquivalent: ""
+        )
+        prefsItem.target = self
+        menu.addItem(prefsItem)
+
+        let toggleItem = NSMenuItem(
+            title: "Toggle Button Style",
+            action: #selector(toggleButtonStyle),
+            keyEquivalent: ""
+        )
+        toggleItem.target = self
+        menu.addItem(toggleItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        let quitItem = NSMenuItem(
+            title: "Quit YabaiIndicator",
+            action: #selector(quit),
+            keyEquivalent: "q"
+        )
+        quitItem.target = self
+        menu.addItem(quitItem)
+
+        // Show menu at the click location
+        if let panel = floatingPanel {
+            menu.popUp(positioning: nil, at: location, in: panel.contentView)
+        }
+    }
+
+    @objc
+    func toggleButtonStyle() {
+        let currentStyle = UserDefaults.standard.buttonStyle
+        let newStyle: ButtonStyle = currentStyle == .numeric ? .windows : .numeric
+        UserDefaults.standard.set(newStyle.rawValue, forKey: "buttonStyle")
     }
 
     func stopClickOutsideMonitor() {
@@ -233,8 +284,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         if panel.isVisible {
             hidePanel()
         } else {
-            // Force the panel to be ordered out first to reset state
-            panel.orderOut(nil)
             showPanel(at: mouseLocation)
         }
     }
@@ -275,12 +324,32 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     
     @objc
     func openPreferences() {
-      if #available(macOS 13, *) {
-          NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-      } else {
-          NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
-      }
-      NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate(ignoringOtherApps: true)
+
+        // Reuse existing window if it's still valid
+        if let window = settingsWindow, window.isVisible {
+            window.orderFrontRegardless()
+            return
+        }
+
+        // Clear old reference and create new window
+        settingsWindow = nil
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 375, height: 150),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "YabaiIndicator Settings"
+        window.center()
+        window.isReleasedWhenClosed = false
+
+        let hostingView = NSHostingView(rootView: SettingsView())
+        window.contentView = hostingView
+
+        window.makeKeyAndOrderFront(nil)
+        settingsWindow = window
     }
     
     func createStatusItemView() -> NSView {
@@ -312,20 +381,18 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func refreshButtonStyle() {
-        // Update floating panel content
-        if let panel = floatingPanel {
-            let hostingView = NSHostingView(rootView: ContentView().environmentObject(spaceModel))
-            hostingView.wantsLayer = true
-            hostingView.layer?.cornerRadius = 6
-            hostingView.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.95).cgColor
-            panel.contentView = hostingView
-        }
+        // PanelContentView uses @AppStorage so it updates automatically - no need to replace contentView
 
-        // Update status bar
+        // Update status bar - show current space(s)
         for subView in statusBarItem?.button?.subviews ?? [] {
             subView.removeFromSuperview()
         }
-        statusBarItem?.button?.addSubview(createStatusItemView())
+
+        // Create a simple view showing current space for status bar
+        let statusBarView = NSHostingView(rootView: StatusBarView().environmentObject(spaceModel))
+        statusBarView.setFrameSize(NSSize(width: 60, height: statusBarHeight))
+        statusBarItem?.button?.addSubview(statusBarView)
+
         refreshData()
     }
 
@@ -349,7 +416,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
 
         // Create status bar item (for menu access)
         statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusBarItem?.menu = createMenu()
 
         // Create floating panel
         createFloatingPanel()

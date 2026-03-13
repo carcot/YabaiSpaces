@@ -9,7 +9,7 @@ import Cocoa
 import SwiftUI
 
 private func drawText(symbol: NSString, color: NSColor, size: CGSize) {
-    let fontSize:CGFloat = 11
+    let fontSize:CGFloat = 13
 
     let attrs:[NSAttributedString.Key : Any] = [.font: NSFont.systemFont(ofSize: fontSize), .foregroundColor: color]
     let boundingBox = symbol.size(withAttributes: attrs)
@@ -20,7 +20,7 @@ private func drawText(symbol: NSString, color: NSColor, size: CGSize) {
 }
 
 func generateImage(symbol: NSString, active: Bool, visible: Bool) -> NSImage {
-    let size = CGSize(width: 24, height: 16)
+    let size = CGSize(width: 28, height: 20)
     let cornerRadius:CGFloat = 6
     
     let canvas = NSRect(origin: CGPoint.zero, size: size)
@@ -86,7 +86,7 @@ func drawWindows(in content: NSRect, windows: [Window], display: Display) {
 }
 
 func generateImage(active: Bool, visible: Bool, windows: [Window], display: Display) -> NSImage {
-    let size = CGSize(width: 24, height: 16)
+    let size = CGSize(width: 28, height: 20)
     let canvas = NSRect(origin: CGPoint.zero, size: size)
     let bounds = NSBezierPath(rect: canvas.insetBy(dx: 4, dy: 4))
     let cornerRadius:CGFloat = 6
