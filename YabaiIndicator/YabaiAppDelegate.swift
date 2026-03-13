@@ -164,10 +164,52 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     func showPanel(at mouseLocation: NSPoint) {
         guard let panel = floatingPanel else { return }
 
-        // Calculate panel position centered on mouse
         let panelSize = panel.frame.size
-        let newX = mouseLocation.x - panelSize.width / 2
-        let newY = mouseLocation.y - panelSize.height / 2
+
+        // Find active space and calculate its position in the grid
+        let showDisplaySeparator = UserDefaults.standard.bool(forKey: "showDisplaySeparator")
+        let showCurrentSpaceOnly = UserDefaults.standard.bool(forKey: "showCurrentSpaceOnly")
+
+        var activeGridIndex = 0
+        var currentIndex = 0
+        var lastDisplay = 0
+
+        for space in spaceModel.spaces {
+            // Add divider before new display (if enabled)
+            if lastDisplay > 0 && space.display != lastDisplay && showDisplaySeparator {
+                currentIndex += 1
+            }
+
+            // Check if this space should be shown
+            if space.visible || !showCurrentSpaceOnly {
+                if space.active {
+                    activeGridIndex = currentIndex
+                    break
+                }
+                currentIndex += 1
+            }
+
+            lastDisplay = space.display
+        }
+
+        // Grid layout: 4 columns, each 32px wide with 2px spacing
+        let columns = 4
+        let columnWidth: CGFloat = 32
+        let columnSpacing: CGFloat = 2
+        let buttonHeight: CGFloat = 20
+        let rowSpacing: CGFloat = 4
+        let padding: CGFloat = 4
+
+        let row = activeGridIndex / columns
+        let col = activeGridIndex % columns
+
+        // Calculate center of the active space button within the panel
+        let buttonCenterX = padding + CGFloat(col) * (columnWidth + columnSpacing) + columnWidth / 2
+        let buttonCenterY = panelSize.height - (padding + CGFloat(row) * (buttonHeight + rowSpacing) + buttonHeight / 2)
+
+        // Position panel so mouse is over the active space button
+        let newX = mouseLocation.x - buttonCenterX
+        let newY = mouseLocation.y - buttonCenterY
 
         panel.setFrameOrigin(NSPoint(x: newX, y: newY))
         panel.orderFrontRegardless()
