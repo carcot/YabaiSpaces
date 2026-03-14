@@ -18,206 +18,6 @@ class KeyPanel: NSPanel {
     }
 }
 
-// Global hotkey using Carbon
-class GlobalHotkey {
-    private var hotkeyRef: EventHotKeyRef?
-
-    func register(keyCode: UInt32, modifiers: UInt32, id: UInt32 = 1) -> Bool {
-        let hotkeyID = EventHotKeyID(signature: OSType(0x59494920), id: id) // 'YI ' + id
-
-        let status = RegisterEventHotKey(
-            keyCode,
-            modifiers,
-            hotkeyID,
-            GetApplicationEventTarget(),
-            0,
-            &hotkeyRef
-        )
-
-        if status != noErr {
-            NSLog("Failed to register hotkey \(id): \(status)")
-            return false
-        }
-
-        NSLog("Registered hotkey \(id): keyCode=\(keyCode), modifiers=\(modifiers)")
-        return true
-    }
-}
-
-// Global modifier key hotkey using CGEventTap
-// Required for modifier keys like Shift, which don't work with Carbon RegisterEventHotKey
-// Behavior: Quick tap (press & release quickly) shows panel; hold or typing does not
-class ModifierKeyHotkey {
-    private var eventTap: CFMachPort?
-    private var runLoopSource: CFRunLoopSource?
-    private let handler: () -> Void
-    private let targetKeyCode: UInt32
-    private var longHoldTimer: DispatchWorkItem?
-    private let longHoldThreshold: TimeInterval = 0.25  // 250ms = boundary between tap and hold
-    private var isTyping = false  // Tracks if another key was pressed while Shift held
-    private var isLongHold = false  // Tracks if Shift was held past threshold
-    private var wasPressed = false  // Track Shift key state
-
-    init(keyCode: UInt32, handler: @escaping () -> Void) {
-        self.targetKeyCode = keyCode
-        self.handler = handler
-        setupEventTap()
-    }
-
-    private func setupEventTap() {
-        // Listen to both flagsChanged AND keyDown events
-        let flagsChangedMask = (1 << CGEventType.flagsChanged.rawValue)
-        let keyDownMask = (1 << CGEventType.keyDown.rawValue)
-        let eventMask = flagsChangedMask | keyDownMask
-
-        let userData = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
-
-        guard let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: CGEventMask(eventMask),
-            callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
-                if let refcon = refcon {
-                    let hotkey = Unmanaged<ModifierKeyHotkey>.fromOpaque(refcon).takeUnretainedValue()
-                    return hotkey.handleEvent(proxy: proxy, type: type, event: event)
-                }
-                return Unmanaged.passUnretained(event)
-            },
-            userInfo: userData
-        ) else {
-            return
-        }
-
-        eventTap = tap
-        runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
-        CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
-        CGEvent.tapEnable(tap: tap, enable: true)
-    }
-
-    private func cancelLongHoldTimer() {
-        longHoldTimer?.cancel()
-        longHoldTimer = nil
-    }
-
-    private func scheduleLongHoldTimer() {
-        // Cancel any existing timer
-        cancelLongHoldTimer()
-
-        // Schedule timer to mark this as a long hold
-        let workItem = DispatchWorkItem { [weak self] in
-            self?.isLongHold = true
-            self?.longHoldTimer = nil
-        }
-        longHoldTimer = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + longHoldThreshold, execute: workItem)
-    }
-
-    private func handleEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
-        if type == .flagsChanged {
-            let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-            let flags = event.flags
-
-            // Check if this is the target key (Right Shift = 60)
-            if keyCode == Int64(targetKeyCode) {
-                let shiftPressed = flags.contains(.maskShift)
-
-                // On press: start long hold timer, reset state
-                if shiftPressed && !wasPressed {
-                    isTyping = false
-                    isLongHold = false
-                    scheduleLongHoldTimer()
-                    wasPressed = true
-                }
-
-                // On release: show panel only if quick tap (not long hold, not typing)
-                if !shiftPressed && wasPressed {
-                    cancelLongHoldTimer()
-                    if !isLongHold && !isTyping {
-                        handler()
-                    }
-                    // Reset state
-                    wasPressed = false
-                }
-            }
-        } else if type == .keyDown {
-            // If Shift is pressed and another key is pressed, mark as typing
-            if wasPressed {
-                let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-                // Ignore modifier key codes (56-63 are modifiers on macOS)
-                let isModifier = (keyCode >= 56 && keyCode <= 63)
-                if !isModifier {
-                    isTyping = true
-                }
-            }
-        }
-        return Unmanaged.passUnretained(event)
-    }
-
-    deinit {
-        cancelLongHoldTimer()
-        if let tap = eventTap {
-            CGEvent.tapEnable(tap: tap, enable: false)
-        }
-        if let source = runLoopSource {
-            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
-        }
-    }
-}
-
-// Global hotkey event dispatcher - single handler for all hotkeys
-class HotkeyEventDispatcher {
-    static let shared = HotkeyEventDispatcher()
-    private var handlers: [UInt32: () -> Void] = [:]
-    private var eventHandlerRef: EventHandlerRef?
-
-    private init() {
-        setupEventHandler()
-    }
-
-    func setHandler(id: UInt32, handler: @escaping () -> Void) {
-        handlers[id] = handler
-    }
-
-    private func setupEventHandler() {
-        var mySpec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-
-        let selfPtr = Unmanaged.passRetained(self).toOpaque()
-
-        InstallEventHandler(GetApplicationEventTarget(), { (nextHandler, theEvent, userData) -> OSStatus in
-            if let userData = userData {
-                let dispatcher = Unmanaged<HotkeyEventDispatcher>.fromOpaque(userData).takeUnretainedValue()
-                return dispatcher.handleEvent(theEvent)
-            }
-            return noErr
-        }, 1, &mySpec, selfPtr, &eventHandlerRef)
-    }
-
-    private func handleEvent(_ event: EventRef?) -> OSStatus {
-        guard let event = event else { return noErr }
-
-        var hotkeyID = EventHotKeyID()
-        let status = GetEventParameter(
-            event,
-            EventParamName(kEventParamDirectObject),
-            EventParamType(typeEventHotKeyID),
-            nil,
-            MemoryLayout<EventHotKeyID>.size,
-            nil,
-            &hotkeyID
-        )
-
-        if status == noErr {
-            NSLog("Hotkey pressed: id=\(hotkeyID.id)")
-            if let handler = handlers[hotkeyID.id] {
-                handler()
-            }
-        }
-
-        return noErr
-    }
-}
-
 extension UserDefaults {
     @objc dynamic var showDisplaySeparator: Bool {
         return bool(forKey: "showDisplaySeparator")
@@ -234,7 +34,7 @@ extension UserDefaults {
     }
 }
 
-class YabaiAppDelegate: NSObject, NSApplicationDelegate {
+class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     var floatingPanel: NSPanel?
     var settingsWindow: NSWindow?
     var statusBarItem: NSStatusItem?
@@ -254,9 +54,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     var sinks: [AnyCancellable?] = []
     var receiverQueue = DispatchQueue(label: "yabai-indicator.socket.receiver")
     var eventMonitors: [Any] = []
-    var globalHotkey: GlobalHotkey?
-    var centeredHotkey: GlobalHotkey?
-    var rightShiftHotkey: ModifierKeyHotkey?
 
     @objc
     func onSpaceChanged(_ notification: Notification) {
@@ -386,7 +183,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         floatingPanel = panel
     }
 
-    func showPanel(at mouseLocation: NSPoint) {
+    func showPanel(at mouseLocation: NSPoint, modifiers: PanelModifiers = .none) {
         guard let panel = floatingPanel else { return }
 
         let panelSize = panel.frame.size
@@ -469,9 +266,14 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
 
         // Start monitoring for clicks outside
         startClickOutsideMonitor()
+
+        // Apply modifiers (e.g., move mouse to panel center)
+        if modifiers.moveMouseToCenter {
+            moveMouseToPanelCenter()
+        }
     }
 
-    func showPanelCentered() {
+    func showPanelCentered(modifiers: PanelModifiers = .none) {
         guard let panel = floatingPanel else { return }
         guard let screen = NSScreen.main else { return }
 
@@ -489,6 +291,25 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         panel.makeKey()
 
         startClickOutsideMonitor()
+
+        // Apply modifiers (e.g., move mouse to panel center)
+        if modifiers.moveMouseToCenter {
+            moveMouseToPanelCenter()
+        }
+    }
+
+    private func moveMouseToPanelCenter() {
+        guard let panel = floatingPanel else { return }
+        let center = NSPoint(
+            x: panel.frame.midX,
+            y: panel.frame.midY
+        )
+        moveCursor(to: center)
+    }
+
+    private func moveCursor(to point: NSPoint) {
+        let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: point, mouseButton: .left)
+        event?.post(tap: .cgSessionEventTap)
     }
 
     func hidePanel() {
@@ -730,52 +551,43 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         eventMonitors.removeAll()
     }
 
-    func setupGlobalHotkeys() {
-        // Cmd+Option+Space hotkey - panel at mouse position
-        let hotkey = GlobalHotkey()
-        // KeyCode 49 = Space, modifiers: cmdKey = 256 (0x100), optionKey = 2048 (0x800)
-        let modifiers: UInt32 = UInt32(cmdKey | optionKey)
-        if hotkey.register(keyCode: 49, modifiers: modifiers, id: 1) {
-            globalHotkey = hotkey
-            HotkeyEventDispatcher.shared.setHandler(id: 1) { [weak self] in
-                self?.togglePanel(at: NSEvent.mouseLocation)
+    func setupDefaultHotkeys() {
+        // Set this as the delegate for hotkey actions
+        HotkeyManager.shared.setDelegate(self)
+
+        // Define bindings declaratively
+        let bindings: [HotkeyBinding] = [
+            // Cmd+Option+Space - toggle panel at mouse position
+            HotkeyBinding(
+                id: 1,
+                keyCode: 49,  // Space
+                modifiers: UInt32(cmdKey | optionKey),
+                action: .toggle(.atMouse(.zero))  // .zero means use current cursor
+            ),
+            // Cmd+Option+Ctrl+Space - toggle centered panel
+            HotkeyBinding(
+                id: 2,
+                keyCode: 49,  // Space
+                modifiers: UInt32(cmdKey | optionKey | controlKey),
+                action: .toggle(.centered)
+            ),
+            // Right Shift - toggle centered panel on quick tap
+            // Uses tap trigger with 0.25s threshold to distinguish tap from hold
+            HotkeyBinding(
+                id: 3,
+                keyCode: 60,  // Right Shift
+                modifiers: 0,
+                action: .toggle(.centered),
+                trigger: .tap(threshold: 0.25),
+                detectTyping: true
+            ),
+        ]
+
+        // Register all bindings
+        for binding in bindings {
+            if !HotkeyManager.shared.register(binding) {
+                NSLog("Failed to register hotkey \(binding.id)")
             }
-        }
-
-        // Cmd+Option+Ctrl+Space hotkey - centered panel
-        let centeredHotkey = GlobalHotkey()
-        // KeyCode 49 = Space, modifiers: cmdKey | optionKey | controlKey
-        let centeredModifiers: UInt32 = UInt32(cmdKey | optionKey | controlKey)
-        if centeredHotkey.register(keyCode: 49, modifiers: centeredModifiers, id: 2) {
-            self.centeredHotkey = centeredHotkey
-            HotkeyEventDispatcher.shared.setHandler(id: 2) { [weak self] in
-                if let panel = self?.floatingPanel, panel.isVisible {
-                    self?.hidePanel()
-                } else {
-                    self?.showPanelCentered()
-                }
-            }
-        }
-
-        // Right Shift hotkey - centered panel
-        // Uses CGEventTap because Carbon RegisterEventHotKey doesn't work for modifier keys
-        // KeyCode 60 = Right Shift (based on HIToolbox/Events.h)
-        rightShiftHotkey = ModifierKeyHotkey(keyCode: 60) { [weak self] in
-            if let panel = self?.floatingPanel, panel.isVisible {
-                self?.hidePanel()
-            } else {
-                self?.showPanelCentered()
-            }
-        }
-    }
-
-    func togglePanel(at mouseLocation: NSPoint) {
-        guard let panel = floatingPanel else { return }
-
-        if panel.isVisible {
-            hidePanel()
-        } else {
-            showPanel(at: mouseLocation)
         }
     }
     
@@ -973,8 +785,8 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         // Create status bar item (for menu access)
         statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
-        // Set up global hotkeys
-        setupGlobalHotkeys()
+        // Set up default hotkeys
+        setupDefaultHotkeys()
 
         refreshButtonStyle()
         registerObservers()

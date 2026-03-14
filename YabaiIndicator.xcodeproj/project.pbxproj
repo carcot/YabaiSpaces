@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		50HKMGR022779500000E8F192 /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50HKMGR012779500000E8F192 /* HotkeyManager.swift */; };
+		50PANEL022779500000E8F192 /* PanelHotkey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50PANEL012779500000E8F192 /* PanelHotkey.swift */; };
 		50PL00022779210000E8F192 /* PanelLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50PL00012779210000E8F192 /* PanelLayout.swift */; };
 		500F41362780826500C6BC9B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 500F41352780826500C6BC9B /* SettingsView.swift */; };
 		50PWCAP002779500000E8F192 /* PrivateWindowCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50PWCAP012779500000E8F192 /* PrivateWindowCapture.swift */; };
@@ -54,6 +56,8 @@
 
 /* Begin PBXFileReference section */
 		500F41352780826500C6BC9B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		50HKMGR012779500000E8F192 /* HotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManager.swift; sourceTree = "<group>"; };
+		50PANEL012779500000E8F192 /* PanelHotkey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelHotkey.swift; sourceTree = "<group>"; };
 		50PL00012779210000E8F192 /* PanelLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelLayout.swift; sourceTree = "<group>"; };
 		50PWCAP012779500000E8F192 /* PrivateWindowCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateWindowCapture.swift; sourceTree = "<group>"; };
 		50THMB0012779500000E8F192 /* ThumbnailCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailCache.swift; sourceTree = "<group>"; };
@@ -148,6 +152,7 @@
 			isa = PBXGroup;
 			children = (
 				5086FE852783036900E51F61 /* Connectors */,
+				50HKMGRGR2779500000E8F192 /* Managers */,
 				5086FE822783024600E51F61 /* Models */,
 				5051A46A2780DC9B00614C85 /* defaults.plist */,
 				506120962779231000E8F192 /* Info.plist */,
@@ -209,6 +214,7 @@
 		5086FE822783024600E51F61 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				50PANEL012779500000E8F192 /* PanelHotkey.swift */,
 				506120AE277A7BF800E8F192 /* SpacesModel.swift */,
 				5086FE832783026C00E51F61 /* ButtonStyle.swift */,
 				5086FE882783598E00E51F61 /* SpaceType.swift */,
@@ -223,6 +229,14 @@
 				5086FE86278303EE00E51F61 /* NativeClient.swift */,
 			);
 			path = Connectors;
+			sourceTree = "<group>";
+		};
+		50HKMGRGR2779500000E8F192 /* Managers */ = {
+			isa = PBXGroup;
+			children = (
+				50HKMGR012779500000E8F192 /* HotkeyManager.swift */,
+			);
+			path = Managers;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -367,6 +381,8 @@
 				506120AF277A7BF800E8F192 /* SpacesModel.swift in Sources */,
 				5086FE87278303EE00E51F61 /* NativeClient.swift in Sources */,
 				50DF24C7277BD18700DF1906 /* ImageGenerator.swift in Sources */,
+				50HKMGR022779500000E8F192 /* HotkeyManager.swift in Sources */,
+				50PANEL022779500000E8F192 /* PanelHotkey.swift in Sources */,
 				50PL00022779210000E8F192 /* PanelLayout.swift in Sources */,
 				50PWCAP002779500000E8F192 /* PrivateWindowCapture.swift in Sources */,
 				50THMB0002779500000E8F192 /* ThumbnailCache.swift in Sources */,

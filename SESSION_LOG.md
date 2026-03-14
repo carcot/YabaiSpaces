@@ -206,3 +206,63 @@ Changed all three hotkey handlers to check panel visibility first and toggle app
 - Press hotkey → panel appears
 - Press same hotkey again → panel disappears
 - Works for all three hotkey combinations
+
+## 2025-03-14: Composable Hotkey System Refactoring
+
+### Problem
+Hotkeys were implemented with three separate, duplicated classes:
+- `GlobalHotkey` (Carbon RegisterEventHotKey for regular keys)
+- `ModifierKeyHotkey` (CGEventTap for modifier keys like Shift)
+- `HotkeyEventDispatcher` (Carbon event handler)
+
+Actions were hardcoded in each handler, making it difficult to:
+- Add new hotkeys without duplicating code
+- Change what action a hotkey performs
+- Add new positioning behaviors
+- Eventually let users customize hotkeys in preferences
+
+### Solution
+Created a composable architecture where **key triggers** are separate from **actions**:
+
+1. **New file: `Models/PanelHotkey.swift`**
+   - `PanelPositioning` enum: `.atMouse(NSPoint)`, `.centered`
+   - `PanelHotkeyAction` enum: `.toggle()`, `.show()`, `.hide()`
+   - `PanelModifiers` struct: `moveMouseToCenter` option
+   - `KeyTrigger` enum: `.immediate`, `.tap(threshold:)`, `.release`
+   - `HotkeyBinding` struct: composes key + modifiers + action + trigger
+   - `PanelHotkeyDelegate` protocol: interface for executing actions
+
+2. **New file: `Managers/HotkeyManager.swift`**
+   - `ComposableHotkey` class: unified CGEventTap-based handler for ALL keys
+   - Respects `KeyTrigger` enum for any key (regular or modifier)
+   - `HotkeyManager` singleton: registers bindings and executes actions
+
+3. **Updated: `YabaiAppDelegate.swift`**
+   - Removed `GlobalHotkey`, `ModifierKeyHotkey`, `HotkeyEventDispatcher` classes
+   - Removed `setupGlobalHotkeys()` function
+   - Added `setupDefaultHotkeys()` with declarative binding definitions
+   - Conforms to `PanelHotkeyDelegate`
+
+### KeyTrigger Behavior
+- `.immediate`: Fires on key down (default for Cmd+Option+Space)
+- `.tap(threshold:)`: Fires only on quick press-release within threshold (Right Shift)
+- `.release`: Fires on key up, regardless of hold duration (unused, reserved for future)
+
+### Benefits
+- Adding new hotkey: one `HotkeyBinding` line, no new classes
+- Changing behavior: modify binding parameters, no handler code changes
+- Future user customization: bindings can be serialized from UserDefaults
+- Single code path for all keys reduces bugs and duplication
+
+### Files Modified
+- **New:** `YabaiIndicator/Models/PanelHotkey.swift`
+- **New:** `YabaiIndicator/Managers/HotkeyManager.swift`
+- **Modified:** `YabaiIndicator/YabaiAppDelegate.swift`
+- **Modified:** `YabaiIndicator.xcodeproj/project.pbxproj` (added new files)
+
+### Testing
+- Build: `xcodebuild -project YabaiIndicator.xcodeproj -scheme YabaiIndicator build`
+- Verified: All three hotkeys work (Cmd+Option+Space, Cmd+Option+Ctrl+Space, Right Shift)
+- Verified: Toggle behavior works on all three
+- Verified: Right Shift tap behavior ignores holds and typing
+

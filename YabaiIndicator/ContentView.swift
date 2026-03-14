@@ -254,7 +254,7 @@ struct StatusBarView: View {
         .background(Color.blue.opacity(0.6))
         .cornerRadius(4)
         .onTapGesture {
-            appDelegate.togglePanel(at: NSEvent.mouseLocation)
+            HotkeyManager.shared.execute(.toggle(.atMouse(NSEvent.mouseLocation)))
         }
     }
 }
