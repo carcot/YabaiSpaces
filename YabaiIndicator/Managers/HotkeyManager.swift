@@ -8,7 +8,87 @@
 import AppKit
 import Carbon
 
-/// Unified composable hotkey using CGEventTap for all keys and trigger types
+// MARK: - Carbon-based Hotkey (for regular keys with modifiers, .immediate trigger)
+
+class CarbonHotkey {
+    private var hotkeyRef: EventHotKeyRef?
+
+    func register(keyCode: UInt32, modifiers: UInt32, id: UInt32 = 1) -> Bool {
+        let hotkeyID = EventHotKeyID(signature: OSType(0x59494920), id: id) // 'YI ' + id
+
+        let status = RegisterEventHotKey(
+            keyCode,
+            modifiers,
+            hotkeyID,
+            GetApplicationEventTarget(),
+            0,
+            &hotkeyRef
+        )
+
+        if status != noErr {
+            NSLog("Failed to register Carbon hotkey \(id): \(status)")
+            return false
+        }
+
+        NSLog("Registered Carbon hotkey \(id): keyCode=\(keyCode), modifiers=\(modifiers)")
+        return true
+    }
+}
+
+// Global hotkey event dispatcher - single handler for all Carbon hotkeys
+class HotkeyEventDispatcher {
+    static let shared = HotkeyEventDispatcher()
+    private var handlers: [UInt32: () -> Void] = [:]
+    private var eventHandlerRef: EventHandlerRef?
+
+    private init() {
+        setupEventHandler()
+    }
+
+    func setHandler(id: UInt32, handler: @escaping () -> Void) {
+        handlers[id] = handler
+    }
+
+    private func setupEventHandler() {
+        var mySpec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+
+        let selfPtr = Unmanaged.passRetained(self).toOpaque()
+
+        InstallEventHandler(GetApplicationEventTarget(), { (nextHandler, theEvent, userData) -> OSStatus in
+            if let userData = userData {
+                let dispatcher = Unmanaged<HotkeyEventDispatcher>.fromOpaque(userData).takeUnretainedValue()
+                return dispatcher.handleEvent(theEvent)
+            }
+            return noErr
+        }, 1, &mySpec, selfPtr, &eventHandlerRef)
+    }
+
+    private func handleEvent(_ event: EventRef?) -> OSStatus {
+        guard let event = event else { return noErr }
+
+        var hotkeyID = EventHotKeyID()
+        let status = GetEventParameter(
+            event,
+            EventParamName(kEventParamDirectObject),
+            EventParamType(typeEventHotKeyID),
+            nil,
+            MemoryLayout<EventHotKeyID>.size,
+            nil,
+            &hotkeyID
+        )
+
+        if status == noErr {
+            if let handler = handlers[hotkeyID.id] {
+                handler()
+            }
+        }
+
+        return noErr
+    }
+}
+
+// MARK: - Composable Hotkey using CGEventTap (for modifier keys and special triggers)
+
 class ComposableHotkey {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -66,7 +146,7 @@ class ComposableHotkey {
         case .tap(let t): triggerDesc = "tap(\(t)s)"
         case .release: triggerDesc = "release"
         }
-        NSLog("Registered composable hotkey \(binding.id): keyCode=\(binding.keyCode), modifiers=\(binding.modifiers), trigger=\(triggerDesc)")
+        NSLog("Registered event tap hotkey \(binding.id): keyCode=\(binding.keyCode), modifiers=\(binding.modifiers), trigger=\(triggerDesc)")
     }
 
     private func handleEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
@@ -79,7 +159,8 @@ class ComposableHotkey {
         if binding.isModifierKey {
             return handleModifierKeyEvent(type: type, event: event)
         } else {
-            // For regular keys, only process if modifiers match and key code matches
+            // For regular keys, only process if key code matches
+            // Note: We only use CGEventTap for regular keys when trigger != .immediate
             if eventKeyCode == Int64(binding.keyCode) && modifiersMatch {
                 return handleRegularKeyEvent(type: type, event: event)
             }
@@ -275,11 +356,14 @@ class ComposableHotkey {
     }
 }
 
+// MARK: - Hotkey Manager
+
 /// Centralized manager for panel hotkeys
 class HotkeyManager {
     static let shared = HotkeyManager()
     private var bindings: [HotkeyBinding] = []
-    private var hotkeys: [UInt32: ComposableHotkey] = [:]
+    private var carbonHotkeys: [UInt32: CarbonHotkey] = [:]
+    private var composableHotkeys: [UInt32: ComposableHotkey] = [:]
     private weak var delegate: PanelHotkeyDelegate?
 
     private init() {}
@@ -292,11 +376,26 @@ class HotkeyManager {
     func register(_ binding: HotkeyBinding) -> Bool {
         bindings.append(binding)
 
-        let hotkey = ComposableHotkey(binding: binding) { [weak self] in
-            self?.execute(binding.action, modifiers: binding.modifiersAfterShow)
+        // Use Carbon for regular keys with .immediate trigger (most common case)
+        // Use CGEventTap for modifier keys and non-immediate triggers
+        if !binding.isModifierKey && binding.trigger == .immediate {
+            let hotkey = CarbonHotkey()
+            if hotkey.register(keyCode: binding.keyCode, modifiers: binding.modifiers, id: binding.id) {
+                carbonHotkeys[binding.id] = hotkey
+                HotkeyEventDispatcher.shared.setHandler(id: binding.id) { [weak self] in
+                    self?.execute(binding.action, modifiers: binding.modifiersAfterShow)
+                }
+                return true
+            }
+            return false
+        } else {
+            // Use CGEventTap for modifier keys or special triggers
+            let hotkey = ComposableHotkey(binding: binding) { [weak self] in
+                self?.execute(binding.action, modifiers: binding.modifiersAfterShow)
+            }
+            composableHotkeys[binding.id] = hotkey
+            return true
         }
-        hotkeys[binding.id] = hotkey
-        return true
     }
 
     /// Execute a panel hotkey action
@@ -330,12 +429,14 @@ class HotkeyManager {
     /// Unregister a hotkey by ID
     func unregister(id: UInt32) {
         bindings.removeAll { $0.id == id }
-        hotkeys.removeValue(forKey: id)
+        carbonHotkeys.removeValue(forKey: id)
+        composableHotkeys.removeValue(forKey: id)
     }
 
     /// Unregister all hotkeys
     func unregisterAll() {
         bindings.removeAll()
-        hotkeys.removeAll()
+        carbonHotkeys.removeAll()
+        composableHotkeys.removeAll()
     }
 }
