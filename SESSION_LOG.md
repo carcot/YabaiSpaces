@@ -181,3 +181,28 @@ Removed screen capture path entirely. Hybrid preview now:
 - Panel opens fast (wallpaper cached)
 - Each space shows unique window outlines from Yabai data
 - No app windows visible in background
+
+## 2025-03-14: Make Panel Hotkeys Toggle Between Show and Hide
+
+### Problem
+All panel hotkeys only showed the panel. Pressing the same key combination again would either move the panel (for mouse position) or re-show it (for centered), not hide it.
+
+### Solution
+Changed all three hotkey handlers to check panel visibility first and toggle appropriately:
+
+**Toggle behavior for all hotkeys:**
+- If panel is visible → hide panel
+- If panel is hidden → show panel
+
+**Affected hotkeys:**
+- `Cmd+Option+Space` → toggles panel at mouse position
+- `Cmd+Option+Ctrl+Space` → toggles centered panel
+- Right Shift tap → toggles centered panel
+
+### Files Modified
+- `YabaiAppDelegate.swift`: Updated `togglePanel()`, centered hotkey handler, and Right Shift handler
+
+### Testing
+- Press hotkey → panel appears
+- Press same hotkey again → panel disappears
+- Works for all three hotkey combinations
