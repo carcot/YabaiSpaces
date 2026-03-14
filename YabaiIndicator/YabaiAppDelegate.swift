@@ -9,6 +9,7 @@ import SwiftUI
 import Socket
 import Combine
 import Carbon
+import ApplicationServices
 
 // Custom panel that can become key window even with nonactivating style
 class KeyPanel: NSPanel {
@@ -40,6 +41,127 @@ class GlobalHotkey {
 
         NSLog("Registered hotkey \(id): keyCode=\(keyCode), modifiers=\(modifiers)")
         return true
+    }
+}
+
+// Global modifier key hotkey using CGEventTap
+// Required for modifier keys like Shift, which don't work with Carbon RegisterEventHotKey
+// Behavior: Quick tap (press & release quickly) shows panel; hold or typing does not
+class ModifierKeyHotkey {
+    private var eventTap: CFMachPort?
+    private var runLoopSource: CFRunLoopSource?
+    private let handler: () -> Void
+    private let targetKeyCode: UInt32
+    private var longHoldTimer: DispatchWorkItem?
+    private let longHoldThreshold: TimeInterval = 0.25  // 250ms = boundary between tap and hold
+    private var isTyping = false  // Tracks if another key was pressed while Shift held
+    private var isLongHold = false  // Tracks if Shift was held past threshold
+    private var wasPressed = false  // Track Shift key state
+
+    init(keyCode: UInt32, handler: @escaping () -> Void) {
+        self.targetKeyCode = keyCode
+        self.handler = handler
+        setupEventTap()
+    }
+
+    private func setupEventTap() {
+        // Listen to both flagsChanged AND keyDown events
+        let flagsChangedMask = (1 << CGEventType.flagsChanged.rawValue)
+        let keyDownMask = (1 << CGEventType.keyDown.rawValue)
+        let eventMask = flagsChangedMask | keyDownMask
+
+        let userData = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+
+        guard let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: CGEventMask(eventMask),
+            callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
+                if let refcon = refcon {
+                    let hotkey = Unmanaged<ModifierKeyHotkey>.fromOpaque(refcon).takeUnretainedValue()
+                    return hotkey.handleEvent(proxy: proxy, type: type, event: event)
+                }
+                return Unmanaged.passUnretained(event)
+            },
+            userInfo: userData
+        ) else {
+            return
+        }
+
+        eventTap = tap
+        runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+    }
+
+    private func cancelLongHoldTimer() {
+        longHoldTimer?.cancel()
+        longHoldTimer = nil
+    }
+
+    private func scheduleLongHoldTimer() {
+        // Cancel any existing timer
+        cancelLongHoldTimer()
+
+        // Schedule timer to mark this as a long hold
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.isLongHold = true
+            self?.longHoldTimer = nil
+        }
+        longHoldTimer = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + longHoldThreshold, execute: workItem)
+    }
+
+    private func handleEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+        if type == .flagsChanged {
+            let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+            let flags = event.flags
+
+            // Check if this is the target key (Right Shift = 60)
+            if keyCode == Int64(targetKeyCode) {
+                let shiftPressed = flags.contains(.maskShift)
+
+                // On press: start long hold timer, reset state
+                if shiftPressed && !wasPressed {
+                    isTyping = false
+                    isLongHold = false
+                    scheduleLongHoldTimer()
+                    wasPressed = true
+                }
+
+                // On release: show panel only if quick tap (not long hold, not typing)
+                if !shiftPressed && wasPressed {
+                    cancelLongHoldTimer()
+                    if !isLongHold && !isTyping {
+                        handler()
+                    }
+                    // Reset state
+                    wasPressed = false
+                }
+            }
+        } else if type == .keyDown {
+            // If Shift is pressed and another key is pressed, mark as typing
+            if wasPressed {
+                let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+                // Ignore modifier key codes (56-63 are modifiers on macOS)
+                let isModifier = (keyCode >= 56 && keyCode <= 63)
+                if !isModifier {
+                    isTyping = true
+                }
+            }
+        }
+        return Unmanaged.passUnretained(event)
+    }
+
+    deinit {
+        cancelLongHoldTimer()
+        if let tap = eventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+        }
+        if let source = runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
+        }
     }
 }
 
@@ -134,6 +256,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
     var eventMonitors: [Any] = []
     var globalHotkey: GlobalHotkey?
     var centeredHotkey: GlobalHotkey?
+    var rightShiftHotkey: ModifierKeyHotkey?
 
     @objc
     func onSpaceChanged(_ notification: Notification) {
@@ -626,19 +749,31 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate {
         if centeredHotkey.register(keyCode: 49, modifiers: centeredModifiers, id: 2) {
             self.centeredHotkey = centeredHotkey
             HotkeyEventDispatcher.shared.setHandler(id: 2) { [weak self] in
+                if let panel = self?.floatingPanel, panel.isVisible {
+                    self?.hidePanel()
+                } else {
+                    self?.showPanelCentered()
+                }
+            }
+        }
+
+        // Right Shift hotkey - centered panel
+        // Uses CGEventTap because Carbon RegisterEventHotKey doesn't work for modifier keys
+        // KeyCode 60 = Right Shift (based on HIToolbox/Events.h)
+        rightShiftHotkey = ModifierKeyHotkey(keyCode: 60) { [weak self] in
+            if let panel = self?.floatingPanel, panel.isVisible {
+                self?.hidePanel()
+            } else {
                 self?.showPanelCentered()
             }
         }
     }
 
     func togglePanel(at mouseLocation: NSPoint) {
-        guard let panel = floatingPanel else {
-            return
-        }
+        guard let panel = floatingPanel else { return }
 
         if panel.isVisible {
-            // Move panel to new location instead of hiding
-            showPanel(at: mouseLocation)
+            hidePanel()
         } else {
             showPanel(at: mouseLocation)
         }
