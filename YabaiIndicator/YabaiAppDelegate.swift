@@ -144,11 +144,12 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
     func onWindowRefresh() {
         let menubarButtonStyle = UserDefaults.standard.menubarButtonStyle
-        if menubarButtonStyle == .windows || menubarButtonStyle == .thumbnail {
-            let windows = gYabaiClient.queryWindows()
-            DispatchQueue.main.async {
-                self.spaceModel.windows = windows
-            }
+
+        // Always query windows for panel (hybrid preview needs window outlines)
+        // regardless of menubar button style
+        let windows = gYabaiClient.queryWindows()
+        DispatchQueue.main.async {
+            self.spaceModel.windows = windows
         }
     }
     
