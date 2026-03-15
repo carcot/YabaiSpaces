@@ -90,30 +90,18 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     }
 
     // Capture thumbnail for a specific space (call when space becomes inactive)
-    // Returns immediately after starting async capture
     func captureThumbnail(for space: Space) {
-        NSLog("captureThumbnail START: space \(space.index) (yabaiIndex: \(space.yabaiIndex), spaceId: \(space.spaceid), display \(space.display))")
-
         let displays = gNativeClient.queryDisplays()
         guard space.display - 1 >= 0, space.display - 1 < displays.count else {
-            NSLog("  ERROR: invalid display index \(space.display - 1), displays.count: \(displays.count)")
+            NSLog("captureThumbnail: invalid display index for space \(space.index)")
             return
         }
         let display = displays[space.display - 1]
-        NSLog("  Display frame: \(display.frame)")
 
         // CRITICAL: Query windows synchronously BEFORE space switch
         let windows = gYabaiClient.queryWindows()
         let spaceWindows = windows.filter { $0.spaceIndex == space.yabaiIndex }
 
-        NSLog("  Total windows from yabai: \(windows.count)")
-        NSLog("  Windows filtered for yabaiIndex \(space.yabaiIndex): \(spaceWindows.count)")
-        for w in spaceWindows.prefix(5) {  // Log first 5 windows
-            NSLog("    - window: \(w.title.prefix(30)) [id: \(w.id), space: \(w.spaceIndex), display: \(w.displayIndex)]")
-        }
-
-        // Capture SYNCHRONOUSLY so cache is updated before we return
-        // This ensures the new space's view will find the cached thumbnail
         // Calculate thumbnail size proportional to display aspect ratio
         let baseHeight: CGFloat = 20 * panelLayout.scale
         let aspect = display.frame.width / display.frame.height
@@ -124,10 +112,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             display: display,
             targetSize: targetSize
         ) {
-            NSLog("captureThumbnail DONE: caching for spaceId \(space.spaceid), size: \(thumbnail.size)")
             gThumbnailCache.set(spaceId: space.spaceid, image: thumbnail)
-        } else {
-            NSLog("captureThumbnail FAILED: for spaceId: \(space.spaceid)")
         }
     }
 
@@ -185,6 +170,13 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
     func showPanel(at mouseLocation: NSPoint, modifiers: PanelModifiers = .none) {
         guard let panel = floatingPanel else { return }
+
+        // Capture current space thumbnail before showing panel
+        // TODO: Make this configurable via preferences (instant show vs fresh thumbnails)
+        // Latency: ~140-150ms, tested as acceptable
+        if let currentSpace = spaceModel.spaces.first(where: { $0.active }) {
+            captureThumbnail(for: currentSpace)
+        }
 
         let panelSize = panel.frame.size
 
@@ -276,6 +268,12 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     func showPanelCentered(modifiers: PanelModifiers = .none) {
         guard let panel = floatingPanel else { return }
         guard let screen = NSScreen.main else { return }
+
+        // Capture current space thumbnail before showing panel
+        // TODO: Make this configurable via preferences (instant show vs fresh thumbnails)
+        if let currentSpace = spaceModel.spaces.first(where: { $0.active }) {
+            captureThumbnail(for: currentSpace)
+        }
 
         let panelSize = panel.frame.size
         let visibleFrame = screen.visibleFrame
