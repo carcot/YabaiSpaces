@@ -344,3 +344,53 @@ let flippedPoint = CGPoint(x: point.x, y: flippedY)
 ### Debug Logging
 Added DEBUG logs for troubleshooting cursor positioning (can be removed later).
 
+## 2025-03-15: Fix Right Shift Double-Tap Issue
+
+### Problem
+Quick taps on Right Shift key registered twice, causing:
+- Panel shows → immediately hides
+- Or panel hides → immediately shows
+
+User reported this started happening out of the blue after working fine previously.
+
+### Root Cause Investigation
+Initially suspected:
+1. Hardware issue (wide Shift key with two actuators)
+2. Electrical bounce/chatter needing debouncing
+
+Debug logging revealed the actual cause: `setupDefaultHotkeys()` was being called
+TWICE during app launch, creating TWO `ComposableHotkey` instances both listening
+to Right Shift (keyCode 60):
+- First instance handler: shows panel
+- Second instance handler: hides panel
+
+**Why two calls?**
+Combine publisher for `gridPosition` (line 975) fires immediately during
+`applicationDidFinishLaunching()`, calling `updateHotkeyPosition()` →
+`setupDefaultHotkeys()`. Then the direct call at line 992 runs again.
+
+### Solution
+Made `setupDefaultHotkeys()` idempotent:
+- Added `hasSetupHotkeys` flag to `YabaiAppDelegate`
+- Guard clause at start of function returns early if already called
+- `updateHotkeyPosition()` resets flag to allow re-registration when settings change
+
+**Additional protection:**
+Added 300ms handler cooldown in `ComposableHotkey` to block any edge case
+duplicate releases (belt-and-suspenders).
+
+### Files Modified
+- `YabaiIndicator/YabaiAppDelegate.swift`:
+  - Added `hasSetupHotkeys` property
+  - Added guard to `setupDefaultHotkeys()`
+  - Reset flag in `updateHotkeyPosition()`
+- `YabaiIndicator/Managers/HotkeyManager.swift`:
+  - Added `lastHandlerCallTime` and `handlerCooldown` to `ComposableHotkey`
+  - Added cooldown check in tap trigger release handling
+  - Added duplicate registration check in `register()`
+
+### Testing
+- Right Shift quick tap now reliably toggles panel once
+- Cooldown prevents any rapid-fire duplicate handler calls
+- Re-registration works when gridPosition setting changes
+
