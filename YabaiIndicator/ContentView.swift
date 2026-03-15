@@ -194,7 +194,7 @@ struct ContentView: View {
     @EnvironmentObject var spaceModel: SpaceModel
     @AppStorage("showDisplaySeparator") private var showDisplaySeparator = true
     @AppStorage("showCurrentSpaceOnly") private var showCurrentSpaceOnly = false
-    @AppStorage("buttonStyle") private var buttonStyle: ButtonStyle = .numeric
+    @AppStorage("menubarButtonStyle") private var menubarButtonStyle: ButtonStyle = .windows
 
     var layout: PanelLayout { PanelLayout(from: UserDefaults.standard) }
 
@@ -217,9 +217,9 @@ struct ContentView: View {
 
     var body: some View {
         LazyVGrid(columns: layout.columns, spacing: layout.rowSpacing) {
-            if buttonStyle == .numeric || spaceModel.displays.count > 0 {
+            if menubarButtonStyle == .numeric || spaceModel.displays.count > 0 {
                 ForEach(generateSpaces(), id: \.self) {space in
-                    switch buttonStyle {
+                    switch menubarButtonStyle {
                     case .numeric:
                         SpaceButton(space: space, layout: layout)
                     case .windows:
@@ -262,11 +262,12 @@ struct StatusBarView: View {
 // Panel content with context menu for right-click
 struct PanelContentView: View {
     @EnvironmentObject var spaceModel: SpaceModel
-    @AppStorage("buttonStyle") private var buttonStyle: ButtonStyle = .numeric
     @AppStorage("showDisplaySeparator") private var showDisplaySeparator = true
-    @AppStorage("showCurrentSpaceOnly") private var showCurrentSpaceOnly = false
 
     @State private var selectedSpaceIndex: Int? = nil  // Track keyboard-selected space
+
+    // Panel always uses thumbnail style (hybrid preview with window outlines)
+    private let panelButtonStyle: ButtonStyle = .thumbnail
 
     var layout: PanelLayout { PanelLayout(from: UserDefaults.standard) }
 
@@ -279,9 +280,8 @@ struct PanelContentView: View {
                     shownSpaces.append(Space(spaceid: 0, uuid: "", visible: true, active: false, display: 0, index: 0, yabaiIndex: 0, type: .divider))
                 }
             }
-            if space.visible || !showCurrentSpaceOnly{
-                shownSpaces.append(space)
-            }
+            // Panel always shows all spaces (ignoring showCurrentSpaceOnly setting)
+            shownSpaces.append(space)
             lastDisplay = space.display
         }
         return shownSpaces
@@ -297,13 +297,13 @@ struct PanelContentView: View {
         let navigableSpaces = spaces.filter { $0.type != .divider }
 
         LazyVGrid(columns: layout.columns, spacing: layout.rowSpacing) {
-            if buttonStyle == .numeric || spaceModel.displays.count > 0 {
+            if panelButtonStyle == .numeric || spaceModel.displays.count > 0 {
                 ForEach(Array(spaces.enumerated()), id: \.element) { index, space in
                     // Calculate navigable index for this space
                     let navigableIndex = navigableSpaces.firstIndex(where: { $0.spaceid == space.spaceid && $0.type != .divider })
 
                     Group {
-                        switch buttonStyle {
+                        switch panelButtonStyle {
                         case .numeric:
                             SpaceButton(space: space, layout: layout)
                         case .windows:

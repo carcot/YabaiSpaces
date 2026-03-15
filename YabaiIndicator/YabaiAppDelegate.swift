@@ -22,14 +22,33 @@ extension UserDefaults {
     @objc dynamic var showDisplaySeparator: Bool {
         return bool(forKey: "showDisplaySeparator")
     }
-    
+
     @objc dynamic var showCurrentSpaceOnly: Bool {
         return bool(forKey: "showCurrentSpaceOnly")
     }
-    
+
     @objc dynamic var buttonStyle: ButtonStyle {
         get {
-            return ButtonStyle(rawValue: self.integer(forKey: "buttonStyle")) ?? ButtonStyle.numeric
+            // For backward compatibility, read from menubarButtonStyle
+            return ButtonStyle(rawValue: self.integer(forKey: "menubarButtonStyle")) ?? ButtonStyle.windows
+        }
+    }
+
+    @objc dynamic var menubarButtonStyle: ButtonStyle {
+        get {
+            return ButtonStyle(rawValue: self.integer(forKey: "menubarButtonStyle")) ?? ButtonStyle.windows
+        }
+    }
+
+    @objc dynamic var gridPosition: GridPosition {
+        get {
+            return GridPosition(rawValue: self.integer(forKey: "gridPosition")) ?? .atCursor
+        }
+    }
+
+    @objc dynamic var cursorPosition: CursorPosition {
+        get {
+            return CursorPosition(rawValue: self.integer(forKey: "cursorPosition")) ?? .onThumbnail
         }
     }
 }
@@ -121,8 +140,8 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     }
 
     func onWindowRefresh() {
-        let buttonStyle = UserDefaults.standard.buttonStyle
-        if buttonStyle == .windows || buttonStyle == .thumbnail {
+        let menubarButtonStyle = UserDefaults.standard.menubarButtonStyle
+        if menubarButtonStyle == .windows || menubarButtonStyle == .thumbnail {
             let windows = gYabaiClient.queryWindows()
             DispatchQueue.main.async {
                 self.spaceModel.windows = windows
@@ -175,9 +194,11 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     func showPanel(at mouseLocation: NSPoint, modifiers: PanelModifiers = .none) {
         guard let panel = floatingPanel else { return }
 
-        // Save cursor position for restoration when panel closes (unless space selected)
+        // Save cursor position for restoration when panel closes (if enabled)
         hideWithoutRestore = false
-        saveCursorPosition()
+        if UserDefaults.standard.bool(forKey: "saveRestoreCursor") {
+            saveCursorPosition()
+        }
 
         // Capture current space thumbnail before showing panel
         // TODO: Make this configurable via preferences (instant show vs fresh thumbnails)
@@ -188,31 +209,36 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
         let panelSize = panel.frame.size
 
-        // Find active space and calculate its position in the grid
-        let showDisplaySeparator = UserDefaults.standard.bool(forKey: "showDisplaySeparator")
-        let showCurrentSpaceOnly = UserDefaults.standard.bool(forKey: "showCurrentSpaceOnly")
-
-        var activeGridIndex = 0
-        var currentIndex = 0
-        var lastDisplay = 0
-
-        for space in spaceModel.spaces {
-            // Add divider before new display (if enabled)
-            if lastDisplay > 0 && space.display != lastDisplay && showDisplaySeparator {
-                currentIndex += 1
+        if UserDefaults.standard.gridPosition == .centered {
+            // Center panel on screen containing cursor
+            let mouseLoc = NSEvent.mouseLocation
+            if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLoc) }) ?? NSScreen.main {
+                let visibleFrame = screen.visibleFrame
+                let x = visibleFrame.midX - panelSize.width / 2
+                let y = visibleFrame.midY - panelSize.height / 2
+                panel.setFrameOrigin(NSPoint(x: x, y: y))
             }
+        } else {
+            // Position panel with thumbnail at cursor
+            // Panel always shows ALL spaces (including dividers)
+            let showDisplaySeparator = UserDefaults.standard.bool(forKey: "showDisplaySeparator")
 
-            // Check if this space should be shown
-            if space.visible || !showCurrentSpaceOnly {
+            var activeGridIndex = 0
+            var lastDisplay = 0
+
+            for space in spaceModel.spaces {
+                // Add divider before new display (if enabled) - dividers take a grid slot
+                if lastDisplay > 0 && space.display != lastDisplay && showDisplaySeparator {
+                    activeGridIndex += 1
+                }
+
+                // Panel shows all spaces, count every space
                 if space.active {
-                    activeGridIndex = currentIndex
                     break
                 }
-                currentIndex += 1
+                activeGridIndex += 1
+                lastDisplay = space.display
             }
-
-            lastDisplay = space.display
-        }
 
         // Grid layout from PanelLayout
         let columns = panelLayout.columnCount
@@ -254,6 +280,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         }
 
         panel.setFrameOrigin(NSPoint(x: newX, y: newY))
+        }
 
         // Reset keyboard selection to active space
         resetPanelSelection()
@@ -267,20 +294,31 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         // Start monitoring for clicks outside
         startClickOutsideMonitor()
 
-        // Move cursor to panel center
-        moveMouseToPanelCenter()
+        // Handle cursor positioning based on settings
+        switch UserDefaults.standard.cursorPosition {
+        case .stayPut:
+            break // Don't move cursor
+        case .centerGrid:
+            moveCursorToPanelGridCenter()
+        case .onThumbnail:
+            moveMouseToPanelCenter()
+        }
     }
 
     func showPanelCentered(modifiers: PanelModifiers = .none) {
         guard let panel = floatingPanel else { return }
-        guard let screen = NSScreen.main else { return }
 
-        // Save cursor position for restoration when panel closes (unless space selected)
+        // Use the screen containing the cursor
+        let mouseLoc = NSEvent.mouseLocation
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLoc) }) ?? NSScreen.main else { return }
+
+        // Save cursor position for restoration when panel closes (if enabled)
         hideWithoutRestore = false
-        saveCursorPosition()
+        if UserDefaults.standard.bool(forKey: "saveRestoreCursor") {
+            saveCursorPosition()
+        }
 
         // Capture current space thumbnail before showing panel
-        // TODO: Make this configurable via preferences (instant show vs fresh thumbnails)
         if let currentSpace = spaceModel.spaces.first(where: { $0.active }) {
             captureThumbnail(for: currentSpace)
         }
@@ -300,8 +338,16 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
         startClickOutsideMonitor()
 
-        // Move cursor to panel center
-        moveMouseToPanelCenter()
+        // Move cursor based on cursorPosition setting
+        let cursorPosition = UserDefaults.standard.cursorPosition
+        switch cursorPosition {
+        case .stayPut:
+            break
+        case .centerGrid:
+            moveCursorToPanelGridCenter()
+        case .onThumbnail:
+            moveMouseToPanelCenter()
+        }
     }
 
     private func moveMouseToPanelCenter() {
@@ -310,26 +356,27 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         NSLog("DEBUG: panel.frame=\(panel.frame)")
 
         // Find the current active space's thumbnail position within the panel
+        // Panel always shows ALL spaces (including dividers)
         let showDisplaySeparator = UserDefaults.standard.bool(forKey: "showDisplaySeparator")
-        let showCurrentSpaceOnly = UserDefaults.standard.bool(forKey: "showCurrentSpaceOnly")
 
         var activeGridIndex = 0
-        var currentIndex = 0
         var lastDisplay = 0
 
         for space in spaceModel.spaces {
+            // Add divider before new display (if enabled) - dividers take a grid slot
             if lastDisplay > 0 && space.display != lastDisplay && showDisplaySeparator {
-                currentIndex += 1
+                activeGridIndex += 1
             }
-            if space.visible || !showCurrentSpaceOnly {
-                if space.active {
-                    activeGridIndex = currentIndex
-                    break
-                }
-                currentIndex += 1
+
+            // Panel shows all spaces, count every space
+            if space.active {
+                break
             }
+            activeGridIndex += 1
             lastDisplay = space.display
         }
+
+        NSLog("DEBUG: activeGridIndex=\(activeGridIndex)")
 
         // Calculate thumbnail center position (same logic as panel layout)
         let columns = panelLayout.columnCount
@@ -342,7 +389,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         let row = activeGridIndex / columns
         let col = activeGridIndex % columns
 
-        NSLog("DEBUG: row=\(row), col=\(col), activeGridIndex=\(activeGridIndex)")
+        NSLog("DEBUG: row=\(row), col=\(col)")
 
         // Thumbnail center relative to panel origin (bottom-left)
         let thumbnailCenterX = padding + CGFloat(col) * (columnWidth + columnSpacing) + columnWidth / 2
@@ -358,6 +405,19 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
         NSLog("Moving cursor to thumbnail center: screen=\(screenPoint)")
         moveCursor(to: screenPoint)
+    }
+
+    private func moveCursorToPanelGridCenter() {
+        guard let panel = floatingPanel else { return }
+
+        NSLog("DEBUG: moveCursorToPanelGridCenter - panel frame: \(panel.frame)")
+
+        // Move cursor to center of the panel
+        let panelSize = panel.frame.size
+        let panelCenterX = panel.frame.origin.x + panelSize.width / 2
+        let panelCenterY = panel.frame.origin.y + panelSize.height / 2
+        NSLog("DEBUG: moveCursorToPanelGridCenter - panel center: x=\(panelCenterX), y=\(panelCenterY)")
+        moveCursor(to: NSPoint(x: panelCenterX, y: panelCenterY))
     }
 
     private func moveCursorToScreenCenter() {
@@ -416,8 +476,8 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         floatingPanel?.orderOut(nil)
         stopClickOutsideMonitor()
 
-        // Restore cursor AFTER panel is hidden (unless hiding after space selection)
-        if !hideWithoutRestore {
+        // Restore cursor AFTER panel is hidden (if enabled and unless hiding after space selection)
+        if !hideWithoutRestore && UserDefaults.standard.bool(forKey: "saveRestoreCursor") {
             restoreCursorPosition()
         }
     }
@@ -516,21 +576,23 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         menu.addItem(quitItem)
 
         // Show menu at the click location
-        if let panel = floatingPanel {
-            menu.popUp(positioning: nil, at: location, in: panel.contentView)
+        // Note: NSMenu uses top-left origin, so we need to flip the Y coordinate
+        if let panel = floatingPanel, let contentView = panel.contentView {
+            let flippedLocation = NSPoint(x: location.x, y: contentView.frame.height - location.y)
+            menu.popUp(positioning: nil, at: flippedLocation, in: contentView)
         }
     }
 
     @objc
     func toggleButtonStyle() {
-        let currentStyle = UserDefaults.standard.buttonStyle
+        let currentStyle = UserDefaults.standard.menubarButtonStyle
         let newStyle: ButtonStyle
         switch currentStyle {
         case .numeric: newStyle = .windows
-        case .windows: newStyle = .thumbnail
-        case .thumbnail: newStyle = .numeric
+        case .windows: newStyle = .numeric
+        default: newStyle = .numeric
         }
-        UserDefaults.standard.set(newStyle.rawValue, forKey: "buttonStyle")
+        UserDefaults.standard.set(newStyle.rawValue, forKey: "menubarButtonStyle")
     }
 
     // MARK: - Panel Keyboard Navigation
@@ -660,29 +722,33 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         // Set this as the delegate for hotkey actions
         HotkeyManager.shared.setDelegate(self)
 
+        // Determine panel position based on user settings
+        let gridPosition = UserDefaults.standard.gridPosition
+        let panelPosition: PanelPositioning = gridPosition == .centered ? .centered : .atMouse(.zero)
+
         // Define bindings declaratively
         let bindings: [HotkeyBinding] = [
-            // Cmd+Option+Space - toggle centered panel (with cursor save/restore)
+            // Cmd+Option+Space - toggle panel (position based on gridPosition setting)
             HotkeyBinding(
                 id: 1,
                 keyCode: 49,  // Space
                 modifiers: UInt32(cmdKey | optionKey),
-                action: .toggle(.centered)
+                action: .toggle(panelPosition)
             ),
-            // Cmd+Option+Ctrl+Space - toggle centered panel (redundant now, same as above)
+            // Cmd+Option+Ctrl+Space - toggle panel (redundant now, same as above)
             HotkeyBinding(
                 id: 2,
                 keyCode: 49,  // Space
                 modifiers: UInt32(cmdKey | optionKey | controlKey),
-                action: .toggle(.centered)
+                action: .toggle(panelPosition)
             ),
-            // Right Shift - toggle centered panel on quick tap
+            // Right Shift - toggle panel on quick tap
             // Uses tap trigger with 0.25s threshold to distinguish tap from hold
             HotkeyBinding(
                 id: 3,
                 keyCode: 60,  // Right Shift
                 modifiers: 0,
-                action: .toggle(.centered),
+                action: .toggle(panelPosition),
                 trigger: .tap(threshold: 0.25),
                 detectTyping: true
             ),
@@ -694,6 +760,12 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
                 NSLog("Failed to register hotkey \(binding.id)")
             }
         }
+    }
+
+    func updateHotkeyPosition() {
+        // Re-register hotkeys with new panel position setting
+        HotkeyManager.shared.unregisterAll()
+        setupDefaultHotkeys()
     }
     
     func socketServer() async {
@@ -730,6 +802,13 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     
     @objc
     func openPreferences() {
+        // Get panel position before hiding (for centering preferences over panel)
+        let panelFrame = floatingPanel?.frame
+
+        // Hide panel immediately without restoring cursor
+        hideWithoutRestore = true
+        hidePanel()
+
         NSApp.activate(ignoringOtherApps: true)
 
         // Reuse existing window if it's still valid
@@ -741,15 +820,26 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         // Clear old reference and create new window
         settingsWindow = nil
 
+        let windowWidth: CGFloat = 375
+        let windowHeight: CGFloat = 150
+
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 375, height: 150),
+            contentRect: NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
         window.title = "YabaiIndicator Settings"
-        window.center()
         window.isReleasedWhenClosed = false
+
+        // Center over the panel's position, or fall back to screen center
+        if let panelFrame = panelFrame {
+            let x = panelFrame.midX - windowWidth / 2
+            let y = panelFrame.midY - windowHeight / 2
+            window.setFrameOrigin(NSPoint(x: x, y: y))
+        } else {
+            window.center()
+        }
 
         let hostingView = NSHostingView(rootView: SettingsView())
         window.contentView = hostingView
@@ -875,7 +965,8 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             spaceModel.objectWillChange.sink{_ in self.refreshBar()},
             UserDefaults.standard.publisher(for: \.showDisplaySeparator).sink {_ in self.refreshBar()},
             UserDefaults.standard.publisher(for: \.showCurrentSpaceOnly).sink {_ in self.refreshBar()},
-            UserDefaults.standard.publisher(for: \.buttonStyle).sink {_ in self.refreshButtonStyle()}
+            UserDefaults.standard.publisher(for: \.menubarButtonStyle).sink {_ in self.refreshButtonStyle()},
+            UserDefaults.standard.publisher(for: \.gridPosition).sink {_ in self.updateHotkeyPosition()}
 
         ]
 

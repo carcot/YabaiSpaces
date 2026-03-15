@@ -2,11 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>buttonStyle</key>
+	<key>menubarButtonStyle</key>
 	<integer>1</integer>
 	<key>showDisplaySeparator</key>
 	<true/>
 	<key>showCurrentSpaceOnly</key>
 	<false/>
+	<key>gridPosition</key>
+	<integer>1</integer>
+	<key>cursorPosition</key>
+	<integer>2</integer>
+	<key>saveRestoreCursor</key>
+	<true/>
 </dict>
 </plist>
