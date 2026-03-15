@@ -44,6 +44,10 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     // Track last active space for thumbnail capture
     private var lastActiveSpaceId: UInt64 = 0
 
+    // Save/restore cursor position when panel opens/closes
+    private var savedCursorPosition: NSPoint?
+    private var hideWithoutRestore = false  // Don't restore cursor after space selection
+
     let statusBarHeight: CGFloat = 22
     let itemWidth: CGFloat = 30
     let panelPadding: CGFloat = 8
@@ -171,6 +175,10 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     func showPanel(at mouseLocation: NSPoint, modifiers: PanelModifiers = .none) {
         guard let panel = floatingPanel else { return }
 
+        // Save cursor position for restoration when panel closes (unless space selected)
+        hideWithoutRestore = false
+        saveCursorPosition()
+
         // Capture current space thumbnail before showing panel
         // TODO: Make this configurable via preferences (instant show vs fresh thumbnails)
         // Latency: ~140-150ms, tested as acceptable
@@ -259,15 +267,17 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         // Start monitoring for clicks outside
         startClickOutsideMonitor()
 
-        // Apply modifiers (e.g., move mouse to panel center)
-        if modifiers.moveMouseToCenter {
-            moveMouseToPanelCenter()
-        }
+        // Move cursor to panel center
+        moveMouseToPanelCenter()
     }
 
     func showPanelCentered(modifiers: PanelModifiers = .none) {
         guard let panel = floatingPanel else { return }
         guard let screen = NSScreen.main else { return }
+
+        // Save cursor position for restoration when panel closes (unless space selected)
+        hideWithoutRestore = false
+        saveCursorPosition()
 
         // Capture current space thumbnail before showing panel
         // TODO: Make this configurable via preferences (instant show vs fresh thumbnails)
@@ -290,29 +300,126 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
         startClickOutsideMonitor()
 
-        // Apply modifiers (e.g., move mouse to panel center)
-        if modifiers.moveMouseToCenter {
-            moveMouseToPanelCenter()
-        }
+        // Move cursor to panel center
+        moveMouseToPanelCenter()
     }
 
     private func moveMouseToPanelCenter() {
         guard let panel = floatingPanel else { return }
+
+        NSLog("DEBUG: panel.frame=\(panel.frame)")
+
+        // Find the current active space's thumbnail position within the panel
+        let showDisplaySeparator = UserDefaults.standard.bool(forKey: "showDisplaySeparator")
+        let showCurrentSpaceOnly = UserDefaults.standard.bool(forKey: "showCurrentSpaceOnly")
+
+        var activeGridIndex = 0
+        var currentIndex = 0
+        var lastDisplay = 0
+
+        for space in spaceModel.spaces {
+            if lastDisplay > 0 && space.display != lastDisplay && showDisplaySeparator {
+                currentIndex += 1
+            }
+            if space.visible || !showCurrentSpaceOnly {
+                if space.active {
+                    activeGridIndex = currentIndex
+                    break
+                }
+                currentIndex += 1
+            }
+            lastDisplay = space.display
+        }
+
+        // Calculate thumbnail center position (same logic as panel layout)
+        let columns = panelLayout.columnCount
+        let columnWidth = panelLayout.columnWidth
+        let columnSpacing = panelLayout.columnSpacing
+        let buttonHeight = panelLayout.buttonHeight
+        let rowSpacing = panelLayout.rowSpacing
+        let padding = panelLayout.padding
+
+        let row = activeGridIndex / columns
+        let col = activeGridIndex % columns
+
+        NSLog("DEBUG: row=\(row), col=\(col), activeGridIndex=\(activeGridIndex)")
+
+        // Thumbnail center relative to panel origin (bottom-left)
+        let thumbnailCenterX = padding + CGFloat(col) * (columnWidth + columnSpacing) + columnWidth / 2
+        let thumbnailCenterY = panel.frame.height - (padding + CGFloat(row) * (buttonHeight + rowSpacing) + buttonHeight / 2)
+
+        NSLog("DEBUG: thumbnailCenter in panel coords: x=\(thumbnailCenterX), y=\(thumbnailCenterY)")
+
+        // Convert to screen coordinates
+        let screenPoint = NSPoint(
+            x: panel.frame.origin.x + thumbnailCenterX,
+            y: panel.frame.origin.y + thumbnailCenterY
+        )
+
+        NSLog("Moving cursor to thumbnail center: screen=\(screenPoint)")
+        moveCursor(to: screenPoint)
+    }
+
+    private func moveCursorToScreenCenter() {
+        // Find the screen containing the cursor, or main screen as fallback
+        let mouseLoc = NSEvent.mouseLocation
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLoc) }) ?? NSScreen.main else { return }
         let center = NSPoint(
-            x: panel.frame.midX,
-            y: panel.frame.midY
+            x: screen.visibleFrame.midX,
+            y: screen.visibleFrame.midY
         )
         moveCursor(to: center)
     }
 
+    private func saveCursorPosition() {
+        savedCursorPosition = NSEvent.mouseLocation
+        NSLog("DEBUG: Saved cursor position: \(savedCursorPosition!)")
+    }
+
+    private func restoreCursorPosition() {
+        guard let saved = savedCursorPosition else { return }
+        NSLog("DEBUG: Restoring cursor to: \(saved)")
+
+        // Flip Y coordinate for CGEvent (top-left origin)
+        guard let mainScreen = NSScreen.main else { return }
+        let flippedY = mainScreen.frame.height - saved.y
+        let flippedPoint = CGPoint(x: saved.x, y: flippedY)
+
+        if let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: flippedPoint, mouseButton: .left) {
+            event.post(tap: .cgSessionEventTap)
+            NSLog("DEBUG: Sent restore event to flipped: \(flippedPoint)")
+        } else {
+            NSLog("DEBUG: Failed to create restore event")
+        }
+        savedCursorPosition = nil
+    }
+
     private func moveCursor(to point: NSPoint) {
-        let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: point, mouseButton: .left)
-        event?.post(tap: .cgSessionEventTap)
+        NSLog("DEBUG: moveCursor called with point=\(point)")
+
+        // Try flipping Y coordinate (CGEvent might use top-left origin)
+        guard let mainScreen = NSScreen.main else { return }
+        let flippedY = mainScreen.frame.height - point.y
+        let flippedPoint = CGPoint(x: point.x, y: flippedY)
+
+        NSLog("DEBUG: flipped point=\(flippedPoint), screenHeight=\(mainScreen.frame.height)")
+
+        if let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: flippedPoint, mouseButton: .left) {
+            event.post(tap: .cgSessionEventTap)
+            NSLog("DEBUG: sent flipped event")
+        } else {
+            NSLog("DEBUG: failed to create event")
+        }
     }
 
     func hidePanel() {
         floatingPanel?.orderOut(nil)
         stopClickOutsideMonitor()
+
+        // Restore cursor AFTER panel is hidden (unless hiding after space selection)
+        if !hideWithoutRestore {
+            restoreCursorPosition()
+        }
     }
 
     func startClickOutsideMonitor() {
@@ -555,14 +662,14 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
         // Define bindings declaratively
         let bindings: [HotkeyBinding] = [
-            // Cmd+Option+Space - toggle panel at mouse position
+            // Cmd+Option+Space - toggle centered panel (with cursor save/restore)
             HotkeyBinding(
                 id: 1,
                 keyCode: 49,  // Space
                 modifiers: UInt32(cmdKey | optionKey),
-                action: .toggle(.atMouse(.zero))  // .zero means use current cursor
+                action: .toggle(.centered)
             ),
-            // Cmd+Option+Ctrl+Space - toggle centered panel
+            // Cmd+Option+Ctrl+Space - toggle centered panel (redundant now, same as above)
             HotkeyBinding(
                 id: 2,
                 keyCode: 49,  // Space
@@ -685,7 +792,8 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         NSLog("switchSpace: calling focusSpace(\(yabaiIndex))")
         gYabaiClient.focusSpace(index: yabaiIndex)
 
-        // Hide panel after switch
+        // Hide panel after switch (don't restore cursor - we're on a new desktop)
+        hideWithoutRestore = true
         hidePanel()
 
         // Capture thumbnail of the NEW space after switching (panel is now hidden)

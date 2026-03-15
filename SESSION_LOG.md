@@ -300,3 +300,47 @@ Make pre-capture configurable via preferences:
 - "Instant panel" (no pre-capture, uses cached thumbnails)
 - "Fresh thumbnails" (pre-capture, ~140ms latency)
 
+
+## 2025-03-15: Cursor Centering and Restoration on Panel Show/Hide
+
+### Changes
+- Panel always centers on screen (changed Cmd+Option+Space from .atMouse to .centered)
+- Cursor moves to center of current space's thumbnail when panel opens
+- Cursor position saved when panel opens
+- Cursor restored to original position when panel closes (Escape, toggle, click-outside)
+- Cursor NOT restored after space selection (stays at center on new desktop)
+
+### Implementation Details
+
+**Cursor Positioning:**
+- Uses same grid layout calculation as panel to find active thumbnail position
+- Converts panel coordinates to screen coordinates for CGEvent
+- Y-coordinate flip required: CGEvent uses top-left origin, Cocoa uses bottom-left
+
+**Coordinate System Fix:**
+```swift
+// Cocoa (bottom-left) to CGEvent (top-left)
+let flippedY = mainScreen.frame.height - point.y
+let flippedPoint = CGPoint(x: point.x, y: flippedY)
+```
+
+**Files Modified:**
+- `YabaiIndicator/YabaiAppDelegate.swift`:
+  - Added `savedCursorPosition` and `hideWithoutRestore` properties
+  - Added `saveCursorPosition()`, `restoreCursorPosition()`, `moveCursorToScreenCenter()`
+  - Updated `moveMouseToPanelCenter()` to position at thumbnail center, not panel center
+  - Updated `showPanel()` and `showPanelCentered()` to save cursor and move to thumbnail center
+  - Updated `hidePanel()` to restore cursor after hiding
+  - Updated `switchSpace()` to set `hideWithoutRestore = true`
+  - Changed Cmd+Option+Space binding from `.atMouse` to `.centered`
+
+### Behavior
+1. Cmd+Option+Space → Panel centers, cursor to current thumbnail center
+2. Escape → Panel closes, cursor returns to original position
+3. Click space → Switches, panel closes, cursor stays at center (new desktop)
+4. Cmd+Option+Ctrl+Space → Same as #1 (now redundant)
+5. Right Shift tap → Same as #1
+
+### Debug Logging
+Added DEBUG logs for troubleshooting cursor positioning (can be removed later).
+
