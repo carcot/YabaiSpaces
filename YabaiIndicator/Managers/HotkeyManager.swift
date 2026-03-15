@@ -101,6 +101,8 @@ class ComposableHotkey {
     private var isTyping = false
     private var isPressed = false
     private var hasFired = false  // Track if action already fired for this press
+    private var lastHandlerCallTime: DispatchTime?  // Track when handler last fired
+    private let handlerCooldown: TimeInterval = 0.300  // Cooldown after firing (blocks duplicate releases)
 
     init(binding: HotkeyBinding, handler: @escaping () -> Void) {
         self.binding = binding
@@ -178,6 +180,8 @@ class ComposableHotkey {
     }
 
     private func handleRegularKeyEvent(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+        let now = DispatchTime.now()
+
         switch binding.trigger {
         case .immediate:
             if type == .keyDown && !hasFired {
@@ -191,7 +195,7 @@ class ComposableHotkey {
             if type == .keyDown && !isPressed {
                 isPressed = true
                 isTyping = false
-                pressStartTime = DispatchTime.now()
+                pressStartTime = now
                 hasFired = false
 
                 // Schedule timeout to mark as "held too long"
@@ -206,14 +210,26 @@ class ComposableHotkey {
                 tapTimer?.cancel()
                 tapTimer = nil
 
+                // Check cooldown - if handler was called recently, ignore this release
+                if let lastCallTime = lastHandlerCallTime {
+                    let elapsed = Double(now.uptimeNanoseconds - lastCallTime.uptimeNanoseconds) / 1_000_000_000
+                    if elapsed < handlerCooldown {
+                        return Unmanaged.passUnretained(event)
+                    }
+                }
+
+                // Set hasFired immediately to prevent duplicates
+                let alreadyFired = hasFired
+                hasFired = true
+
                 // Fire only if quick tap (not typing, not held too long, haven't fired yet)
-                if !isTyping && !hasFired {
+                if !isTyping && !alreadyFired {
                     if let start = pressStartTime {
-                        let elapsed = DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds
+                        let elapsed = now.uptimeNanoseconds - start.uptimeNanoseconds
                         let elapsedSeconds = Double(elapsed) / 1_000_000_000
                         if elapsedSeconds < threshold {
+                            lastHandlerCallTime = now
                             handler()
-                            hasFired = true
                         }
                     }
                 }
@@ -260,11 +276,13 @@ class ComposableHotkey {
             }
 
         case .tap(let threshold):
+            let now = DispatchTime.now()
+
             if isPressed && !self.isPressed {
                 // Press started
                 self.isPressed = true
                 isTyping = false
-                pressStartTime = DispatchTime.now()
+                pressStartTime = now
                 hasFired = false
 
                 let workItem = DispatchWorkItem { [weak self] in
@@ -279,16 +297,25 @@ class ComposableHotkey {
                 tapTimer?.cancel()
                 tapTimer = nil
 
+                // Check cooldown - if handler was called recently, ignore this release
+                if let lastCallTime = lastHandlerCallTime {
+                    let elapsed = Double(now.uptimeNanoseconds - lastCallTime.uptimeNanoseconds) / 1_000_000_000
+                    if elapsed < handlerCooldown {
+                        return Unmanaged.passUnretained(event)
+                    }
+                }
+
                 // Set hasFired immediately to prevent duplicate events from firing
-                // Then check conditions and possibly unset if we decide not to fire
                 let alreadyFired = hasFired
                 hasFired = true
 
                 if !isTyping && !alreadyFired {
                     if let start = pressStartTime {
-                        let elapsed = DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds
+                        let elapsed = now.uptimeNanoseconds - start.uptimeNanoseconds
                         let elapsedSeconds = Double(elapsed) / 1_000_000_000
+
                         if elapsedSeconds < threshold {
+                            lastHandlerCallTime = now
                             handler()
                         } else {
                             // Held too long, reset hasFired for next press
@@ -381,6 +408,14 @@ class HotkeyManager {
 
     /// Register a hotkey binding. Returns true if successful.
     func register(_ binding: HotkeyBinding) -> Bool {
+        // Prevent duplicate registrations - if hotkey with this ID already exists, don't re-register
+        if composableHotkeys[binding.id] != nil {
+            return true
+        }
+        if carbonHotkeys[binding.id] != nil {
+            return true
+        }
+
         bindings.append(binding)
 
         // Use Carbon for regular keys with .immediate trigger (most common case)
@@ -437,13 +472,14 @@ class HotkeyManager {
     func unregister(id: UInt32) {
         bindings.removeAll { $0.id == id }
         carbonHotkeys.removeValue(forKey: id)
+        // Explicitly disable and remove the event tap
         composableHotkeys.removeValue(forKey: id)
     }
 
     /// Unregister all hotkeys
     func unregisterAll() {
-        bindings.removeAll()
-        carbonHotkeys.removeAll()
         composableHotkeys.removeAll()
+        carbonHotkeys.removeAll()
+        bindings.removeAll()
     }
 }

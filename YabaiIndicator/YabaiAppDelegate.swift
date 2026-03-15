@@ -67,6 +67,9 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     private var savedCursorPosition: NSPoint?
     private var hideWithoutRestore = false  // Don't restore cursor after space selection
 
+    // Ensure hotkeys are only set up once (Combine publisher may fire during init)
+    private var hasSetupHotkeys = false
+
     let statusBarHeight: CGFloat = 22
     let itemWidth: CGFloat = 30
     let panelPadding: CGFloat = 8
@@ -719,6 +722,11 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     }
 
     func setupDefaultHotkeys() {
+        // Idempotent guard - only set up hotkeys once
+        // (Combine publishers may fire during app initialization)
+        guard !hasSetupHotkeys else { return }
+        hasSetupHotkeys = true
+
         // Set this as the delegate for hotkey actions
         HotkeyManager.shared.setDelegate(self)
 
@@ -765,6 +773,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     func updateHotkeyPosition() {
         // Re-register hotkeys with new panel position setting
         HotkeyManager.shared.unregisterAll()
+        hasSetupHotkeys = false  // Reset to allow re-registration
         setupDefaultHotkeys()
     }
     
