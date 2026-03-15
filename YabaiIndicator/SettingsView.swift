@@ -19,6 +19,8 @@ import SwiftUI
 }
 
 struct SettingsView : View {
+    @AppStorage("showMenubar") private var showMenubar = true
+    @AppStorage("showPanel") private var showPanel = true
     @AppStorage("showDisplaySeparator") private var showDisplaySeparator = true
     @AppStorage("showCurrentSpaceOnly") private var showCurrentSpaceOnly = false
 
@@ -28,44 +30,70 @@ struct SettingsView : View {
     @AppStorage("cursorPosition") private var cursorPosition = CursorPosition.onThumbnail
     @AppStorage("saveRestoreCursor") private var saveRestoreCursor = true
 
-    private enum Tabs: Hashable {
-        case menubar, spacesGrid
-    }
-
     var body: some View {
-        TabView {
-            Form {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 8) {
+                // Menubar Section
+                Toggle("Show Menubar", isOn: $showMenubar)
+                    .padding(.leading, 16)
+
                 Toggle("Show Display Separator", isOn: $showDisplaySeparator)
+                    .padding(.leading, 32)
+                    .disabled(!showMenubar)
+                    .opacity(showMenubar ? 1 : 0.4)
                 Toggle("Show Current Space Only", isOn: $showCurrentSpaceOnly)
+                    .padding(.leading, 32)
+                    .disabled(!showMenubar)
+                    .opacity(showMenubar ? 1 : 0.4)
                 Picker("Button Style", selection: $menubarButtonStyle) {
                     Text("Numeric").tag(ButtonStyle.numeric)
                     Text("Windows").tag(ButtonStyle.windows)
                 }
-            }.padding(10)
-                .tabItem {
-                    Label("Menubar", systemImage: "menubar.rectangle")
-                }
-                .tag(Tabs.menubar)
+                .pickerStyle(.segmented)
+                .padding(.leading, 32)
+                .padding(.trailing, 16)
+                .disabled(!showMenubar)
+                .opacity(showMenubar ? 1 : 0.4)
+            }
+            .padding(.bottom, 12)
 
-            Form {
+            Rectangle()
+                .fill(Color.secondary.opacity(0.3))
+                .frame(width: 200, height: 1)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+
+            VStack(alignment: .leading, spacing: 8) {
+                // Spaces Grid Section
+                Toggle("Show Spaces Grid", isOn: $showPanel)
+                    .padding(.leading, 16)
+
                 Picker("Grid Position", selection: $gridPosition) {
                     Text("Centered").tag(GridPosition.centered)
                     Text("At Cursor").tag(GridPosition.atCursor)
                 }
+                .pickerStyle(.segmented)
+                .padding(.leading, 32)
+                .padding(.trailing, 16)
+                .disabled(!showPanel)
+                .opacity(showPanel ? 1 : 0.4)
                 Picker("Cursor Position", selection: $cursorPosition) {
-                    Text("Stay Put").tag(CursorPosition.stayPut)
-                    Text("Center in Grid").tag(CursorPosition.centerGrid)
                     Text("On Active Thumbnail").tag(CursorPosition.onThumbnail)
+                    Text("Centered in Grid").tag(CursorPosition.centerGrid)
+                    Text("Stay Put").tag(CursorPosition.stayPut)
                 }
+                .pickerStyle(.segmented)
+                .padding(.leading, 32)
+                .padding(.trailing, 16)
+                .disabled(!showPanel)
+                .opacity(showPanel ? 1 : 0.4)
                 Toggle("Save and Restore Cursor on Close", isOn: $saveRestoreCursor)
-                Text("Panel always shows hybrid preview (window outlines)").font(.caption).foregroundColor(.secondary)
-            }.padding(10)
-                .tabItem {
-                    Label("Spaces Grid", systemImage: "square.grid.3x3")
-                }
-                .tag(Tabs.spacesGrid)
-
+                    .padding(.leading, 32)
+                    .disabled(!showPanel)
+                    .opacity(showPanel ? 1 : 0.4)
+            }
+            .padding(.top, 4)
         }
-        .frame(width: 375, height: 180)
+        .padding(12)
     }
 }

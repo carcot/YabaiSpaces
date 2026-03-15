@@ -344,6 +344,57 @@ let flippedPoint = CGPoint(x: point.x, y: flippedY)
 ### Debug Logging
 Added DEBUG logs for troubleshooting cursor positioning (can be removed later).
 
+## 2025-03-15: Redesign Settings Window - Single Panel with Show/Hide Controls
+
+### Problem
+Settings window used TabView with separate "Menubar" and "Spaces Grid" tabs, making it unclear how to enable/disable each mode independently. User wanted unified controls.
+
+### Solution
+Redesigned settings as a single panel with:
+
+1. **Section checkboxes** - "Show Menubar" and "Show Spaces Grid" toggles at top of each section
+2. **Dimmed controls** - When section is unchecked, its controls are dimmed (40% opacity) and disabled, not hidden
+3. **Auto-sizing window** - Window sizes itself to fit content using `NSHostingView.fittingSize`
+4. **Segmented pickers** - Changed dropdowns to segmented controls for better visibility
+5. **Reordered Cursor Position** - Now: "On Active Thumbnail", "Centered in Grid", "Stay Put"
+
+### UI Layout
+```
+┌─────────────────────────────────────┐
+│ ☑ Show Menubar                      │
+│   ☑ Show Display Separator          │
+│   ☐ Show Current Space Only         │
+│   Button Style: [Numeric | Windows] │
+│                                     │
+│         ──────────────────           │
+│                                     │
+│ ☑ Show Spaces Grid                  │
+│   Grid Position: [Centered | At Cursor] │
+│   Cursor Position: [On Active | Centered | Stay] │
+│   ☑ Save and Restore Cursor         │
+└─────────────────────────────────────┘
+```
+
+### Files Modified
+- `YabaiIndicator/SettingsView.swift`:
+  - Removed TabView, replaced with VStack with two sections
+  - Added `showMenubar` and `showPanel` @AppStorage properties
+  - Manual padding/indentation: section headers at 16pt, children at 32pt
+  - Centered 200pt divider between sections
+  - Added disabled/opacity modifiers for dimming
+  - Changed pickers to `.segmented` style
+  - Reordered Cursor Position options
+- `YabaiIndicator/YabaiAppDelegate.swift`:
+  - Settings window now uses `fittingSize` to auto-size to content
+  - Removed hardcoded window dimensions
+- `YabaiIndicator/defaults.plist`:
+  - Added `showMenubar = true` and `showPanel = true` defaults
+
+### Future Work
+Wire up `showMenubar` and `showPanel` to actually:
+- Hide/show menubar status item
+- Enable/disable panel hotkeys
+
 ## 2025-03-15: Fix Right Shift Double-Tap Issue
 
 ### Problem

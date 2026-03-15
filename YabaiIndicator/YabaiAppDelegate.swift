@@ -829,29 +829,27 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         // Clear old reference and create new window
         settingsWindow = nil
 
-        let windowWidth: CGFloat = 375
-        let windowHeight: CGFloat = 150
+        let hostingView = NSHostingView(rootView: SettingsView())
+        let fittingSize = hostingView.fittingSize
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight),
+            contentRect: NSRect(x: 0, y: 0, width: fittingSize.width, height: fittingSize.height),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
         window.title = "YabaiIndicator Settings"
         window.isReleasedWhenClosed = false
+        window.contentView = hostingView
 
         // Center over the panel's position, or fall back to screen center
         if let panelFrame = panelFrame {
-            let x = panelFrame.midX - windowWidth / 2
-            let y = panelFrame.midY - windowHeight / 2
+            let x = panelFrame.midX - fittingSize.width / 2
+            let y = panelFrame.midY - fittingSize.height / 2
             window.setFrameOrigin(NSPoint(x: x, y: y))
         } else {
             window.center()
         }
-
-        let hostingView = NSHostingView(rootView: SettingsView())
-        window.contentView = hostingView
 
         window.makeKeyAndOrderFront(nil)
         settingsWindow = window
