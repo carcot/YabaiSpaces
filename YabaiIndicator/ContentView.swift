@@ -124,13 +124,15 @@ struct ThumbnailSpaceButton : View {
                 }
                 .overlay(
                     // Border styling: selection (navigation) + active state
+                    // Border drawn inside the edge (inset) to avoid eating into thumbnail content
                     ZStack {
                         // Border: accent when active or selected, secondary gray otherwise
-                        // Thickness: 4px when active, 3px when selected inactive, 1px when inactive
+                        // Thickness: 3px when active, 2px when selected inactive, 1px when inactive
                         let isAccent = space.active || isSelected
-                        let thickness: CGFloat = space.active ? 4 : (isSelected ? 3 : 1)
+                        let thickness: CGFloat = space.active ? 3 : (isSelected ? 2 : 1)
 
                         RoundedRectangle(cornerRadius: 0)
+                            .inset(by: thickness / 2)
                             .stroke(
                                 isAccent ? Color.accentColor : Color.secondary,
                                 lineWidth: thickness
