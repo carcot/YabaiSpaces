@@ -266,3 +266,37 @@ Created a composable architecture where **key triggers** are separate from **act
 - Verified: Toggle behavior works on all three
 - Verified: Right Shift tap behavior ignores holds and typing
 
+
+## 2025-03-15: Thumbnail Pre-Capture on Panel Show
+
+### Problem
+Thumbnails were only captured AFTER switching spaces, not when opening
+the panel. This meant the panel could show stale thumbnails if the user
+had been working on the current space for a while.
+
+### Solution
+Pre-capture the current space's thumbnail immediately before showing the
+panel (in `showPanel()` and `showPanelCentered()`).
+
+### Performance Testing
+Measured capture timing using `CFAbsoluteTimeGetCurrent()`:
+
+- Total: 126-276ms (average ~177ms)
+- queryDisplay: ~0.1ms (negligible)
+- queryWindows: 29-125ms (variable, depends on window count)
+- capture: 74-151ms (variable)
+
+User testing confirmed ~140ms latency is acceptable for the tradeoff
+of always-fresh thumbnails.
+
+### Files Modified
+- `YabaiIndicator/YabaiAppDelegate.swift`:
+  - Added pre-capture in `showPanel()`
+  - Added pre-capture in `showPanelCentered()`
+  - Removed debug logging code
+
+### Future Work
+Make pre-capture configurable via preferences:
+- "Instant panel" (no pre-capture, uses cached thumbnails)
+- "Fresh thumbnails" (pre-capture, ~140ms latency)
+
