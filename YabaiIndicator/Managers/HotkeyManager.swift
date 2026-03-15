@@ -279,13 +279,20 @@ class ComposableHotkey {
                 tapTimer?.cancel()
                 tapTimer = nil
 
-                if !isTyping && !hasFired {
+                // Set hasFired immediately to prevent duplicate events from firing
+                // Then check conditions and possibly unset if we decide not to fire
+                let alreadyFired = hasFired
+                hasFired = true
+
+                if !isTyping && !alreadyFired {
                     if let start = pressStartTime {
                         let elapsed = DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds
                         let elapsedSeconds = Double(elapsed) / 1_000_000_000
                         if elapsedSeconds < threshold {
                             handler()
-                            hasFired = true
+                        } else {
+                            // Held too long, reset hasFired for next press
+                            hasFired = false
                         }
                     }
                 }
