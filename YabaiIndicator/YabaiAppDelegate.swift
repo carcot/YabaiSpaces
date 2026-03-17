@@ -1079,21 +1079,27 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let defaults = UserDefaults.standard
+
+        // Check for unpersisted panel defaults BEFORE register()
+        // (object(forKey) returns nil for truly missing values before registration)
+        let needsPanelColumns = (defaults.object(forKey: "panelColumns") == nil)
+        let needsPanelRows = (defaults.object(forKey: "panelRows") == nil)
+
         if let prefs = Bundle.main.path(forResource: "defaults", ofType: "plist"),
             let dict = NSDictionary(contentsOfFile: prefs) as? [String : Any] {
-          UserDefaults.standard.register(defaults: dict)
-
-          // Ensure grid defaults are persisted on first launch
-          // Use a flag to track if we've done this initial write
-          let defaults = UserDefaults.standard
-          if !defaults.bool(forKey: "panelDefaultsInitialized") {
-              defaults.set(4, forKey: "panelColumns")
-              defaults.set(3, forKey: "panelRows")
-              defaults.set(true, forKey: "panelDefaultsInitialized")
-              defaults.synchronize()
-              NSLog("DEBUG: Initialized panel defaults to 4x3")
-          }
+          defaults.register(defaults: dict)
         }
+
+        // Write defaults after register() so they persist
+        if needsPanelColumns {
+            defaults.set(4, forKey: "panelColumns")
+        }
+        if needsPanelRows {
+            defaults.set(3, forKey: "panelRows")
+        }
+        defaults.synchronize()
+        NSLog("DEBUG: panelColumns=\(defaults.integer(forKey: "panelColumns")), panelRows=\(defaults.integer(forKey: "panelRows"))")
 
         sinks = [
             spaceModel.objectWillChange.sink{_ in self.refreshBar()},
