@@ -38,7 +38,7 @@ class YabaiClient {
                 do {
                     resp = try JSONSerialization.jsonObject(with: data, options: [])
                 } catch {
-                    print(error)
+                    // JSON parsing error
                 }
             }
         }

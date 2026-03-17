@@ -25,19 +25,16 @@ class ThumbnailCache {
     /// Get cached thumbnail for a space
     func get(spaceId: UInt64) -> NSImage? {
         if let image = cache[spaceId] {
-            NSLog("Cache HIT for spaceId: \(spaceId)")
             // Move to end of access order (most recently used)
             accessOrder.removeAll { $0 == spaceId }
             accessOrder.append(spaceId)
             return image
         }
-        NSLog("Cache MISS for spaceId: \(spaceId)")
         return nil
     }
 
     /// Set thumbnail for a space, evicting oldest if necessary
     func set(spaceId: UInt64, image: NSImage) {
-        NSLog("Cache SET for spaceId: \(spaceId), cache size before: \(cache.count)")
         // Remove existing entry if present
         if cache[spaceId] != nil {
             accessOrder.removeAll { $0 == spaceId }
@@ -54,7 +51,6 @@ class ThumbnailCache {
                 accessOrder.removeFirst()
             }
         }
-        NSLog("Cache SET complete, cache size after: \(cache.count)")
 
         // Post notification so views can reload
         NotificationCenter.default.post(

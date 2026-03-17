@@ -127,7 +127,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     func captureThumbnail(for space: Space) {
         let displays = gNativeClient.queryDisplays()
         guard space.display - 1 >= 0, space.display - 1 < displays.count else {
-            NSLog("captureThumbnail: invalid display index for space \(space.index)")
             return
         }
         let display = displays[space.display - 1]
@@ -416,8 +415,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     private func moveMouseToPanelCenter() {
         guard let panel = floatingPanel else { return }
 
-        NSLog("DEBUG: panel.frame=\(panel.frame)")
-
         // Find the current active space's thumbnail position within the panel
         // Panel always shows ALL spaces (including dividers)
         let showDisplaySeparator = UserDefaults.standard.bool(forKey: "showDisplaySeparator")
@@ -439,8 +436,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             lastDisplay = space.display
         }
 
-        NSLog("DEBUG: activeGridIndex=\(activeGridIndex)")
-
         // Calculate thumbnail center position (same logic as panel layout)
         let columns = panelLayout.columnCount
         let columnWidth = panelLayout.columnWidth
@@ -452,13 +447,9 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         let row = activeGridIndex / columns
         let col = activeGridIndex % columns
 
-        NSLog("DEBUG: row=\(row), col=\(col)")
-
         // Thumbnail center relative to panel origin (bottom-left)
         let thumbnailCenterX = padding + CGFloat(col) * (columnWidth + columnSpacing) + columnWidth / 2
         let thumbnailCenterY = panel.frame.height - (padding + CGFloat(row) * (buttonHeight + rowSpacing) + buttonHeight / 2)
-
-        NSLog("DEBUG: thumbnailCenter in panel coords: x=\(thumbnailCenterX), y=\(thumbnailCenterY)")
 
         // Convert to screen coordinates
         let screenPoint = NSPoint(
@@ -466,20 +457,16 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             y: panel.frame.origin.y + thumbnailCenterY
         )
 
-        NSLog("Moving cursor to thumbnail center: screen=\(screenPoint)")
         moveCursor(to: screenPoint)
     }
 
     private func moveCursorToPanelGridCenter() {
         guard let panel = floatingPanel else { return }
 
-        NSLog("DEBUG: moveCursorToPanelGridCenter - panel frame: \(panel.frame)")
-
         // Move cursor to center of the panel
         let panelSize = panel.frame.size
         let panelCenterX = panel.frame.origin.x + panelSize.width / 2
         let panelCenterY = panel.frame.origin.y + panelSize.height / 2
-        NSLog("DEBUG: moveCursorToPanelGridCenter - panel center: x=\(panelCenterX), y=\(panelCenterY)")
         moveCursor(to: NSPoint(x: panelCenterX, y: panelCenterY))
     }
 
@@ -496,12 +483,10 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
     private func saveCursorPosition() {
         savedCursorPosition = NSEvent.mouseLocation
-        NSLog("DEBUG: Saved cursor position: \(savedCursorPosition!)")
     }
 
     private func restoreCursorPosition() {
         guard let saved = savedCursorPosition else { return }
-        NSLog("DEBUG: Restoring cursor to: \(saved)")
 
         // Flip Y coordinate for CGEvent (top-left origin)
         guard let mainScreen = NSScreen.main else { return }
@@ -510,28 +495,18 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
         if let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: flippedPoint, mouseButton: .left) {
             event.post(tap: .cgSessionEventTap)
-            NSLog("DEBUG: Sent restore event to flipped: \(flippedPoint)")
-        } else {
-            NSLog("DEBUG: Failed to create restore event")
         }
         savedCursorPosition = nil
     }
 
     private func moveCursor(to point: NSPoint) {
-        NSLog("DEBUG: moveCursor called with point=\(point)")
-
         // Try flipping Y coordinate (CGEvent might use top-left origin)
         guard let mainScreen = NSScreen.main else { return }
         let flippedY = mainScreen.frame.height - point.y
         let flippedPoint = CGPoint(x: point.x, y: flippedY)
 
-        NSLog("DEBUG: flipped point=\(flippedPoint), screenHeight=\(mainScreen.frame.height)")
-
         if let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: flippedPoint, mouseButton: .left) {
             event.post(tap: .cgSessionEventTap)
-            NSLog("DEBUG: sent flipped event")
-        } else {
-            NSLog("DEBUG: failed to create event")
         }
     }
 
@@ -546,7 +521,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     }
 
     func startClickOutsideMonitor() {
-        NSLog("startClickOutsideMonitor: setting up event monitors")
         stopClickOutsideMonitor() // Remove any existing monitor
 
         // Local monitor for clicks within our app - ONLY for panel interactions
@@ -556,10 +530,8 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
                 return event  // Let all other clicks pass through normally
             }
 
-            NSLog("Local click (panel visible): button=\(event.buttonNumber), location=\(event.locationInWindow)")
             // Right-click (button=1 on macOS) shows menu
             if event.buttonNumber == 1 {
-                NSLog("Right-click detected, showing menu")
                 self?.showPanelMenu(at: event.locationInWindow)
                 return nil  // Consume right-click
             }
@@ -576,7 +548,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             guard let panel = self?.floatingPanel, panel.isVisible else {
                 return event  // Let keys pass through normally
             }
-            NSLog("Local keyDown: keyCode=\(event.keyCode), panel.visible=\(panel.isVisible)")
 
             // Handle navigation keys for panel
             let handled = self?.handlePanelKeyEvent(event) ?? false
@@ -589,9 +560,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
         // Global monitor for Escape key - needed because panel is non-activating
         let globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            NSLog("Global keyDown: keyCode=\(event.keyCode)")
             if event.keyCode == 53 {  // 53 = Escape
-                NSLog("Escape pressed (global), hiding panel")
                 self?.hidePanel()
             }
         }
@@ -606,7 +575,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         if let key = keyMonitor { eventMonitors.append(key) }
         if let globalKey = globalKeyMonitor { eventMonitors.append(globalKey) }
         if let global = globalMonitor { eventMonitors.append(global) }
-        NSLog("startClickOutsideMonitor: \(eventMonitors.count) monitors registered")
     }
 
     func showPanelMenu(at location: NSPoint) {
@@ -757,7 +725,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             hidePanel()
             return true
         case 53: // Escape
-            NSLog("Escape pressed, hiding panel")
             hidePanel()
             return true
         default:
@@ -827,7 +794,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         // Register all bindings
         for binding in bindings {
             if !HotkeyManager.shared.register(binding) {
-                NSLog("Failed to register hotkey \(binding.id)")
+                // Failed to register hotkey
             }
         }
     }
@@ -893,9 +860,8 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
                 }
             }
         } catch {
-            NSLog("SocketServer Error: \(error)")
+            // Socket server error
         }
-        NSLog("SocketServer Ended")
     }
     
     @objc
@@ -999,7 +965,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     // Switch spaces
     func switchSpace(to yabaiIndex: Int) {
         // Perform the space switch
-        NSLog("switchSpace: calling focusSpace(\(yabaiIndex))")
         gYabaiClient.focusSpace(index: yabaiIndex)
 
         // Hide panel after switch (don't restore cursor - we're on a new desktop)
@@ -1018,19 +983,10 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
                 self.spaceModel.spaces = spaceElems
             }
 
-            // Debug: log all active spaces
-            let activeSpaces = spaceElems.filter { $0.active }
-            NSLog("switchSpace async: active spaces after switch: \(activeSpaces.map { "[index:\($0.index), yabaiIndex:\($0.yabaiIndex), type:\($0.type)]" }.joined(separator: ", "))")
-
             // Find space by yabaiIndex - capture even if 'active' flag isn't set correctly
             // (macOS sometimes misreports active status, especially for spaces with empty UUIDs)
             if let newActive = spaceElems.first(where: { $0.yabaiIndex == yabaiIndex }) {
-                NSLog("switchSpace: capturing thumbnail for space \(newActive.index) (yabaiIndex: \(newActive.yabaiIndex), active: \(newActive.active))")
                 self.captureThumbnail(for: newActive)
-            } else {
-                NSLog("switchSpace: WARNING - no space found with yabaiIndex \(yabaiIndex)")
-                // Log all spaces with their yabaiIndex for debugging
-                NSLog("switchSpace: all spaces: \(spaceElems.map { "[index:\($0.index), yabaiIndex:\($0.yabaiIndex), active:\($0.active)]" }.joined(separator: ", "))")
             }
         }
     }
@@ -1069,8 +1025,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         // Save to UserDefaults so PanelContentView can read it
         panelLayout.save()
 
-        NSLog("PanelLayout updated: scale=\(panelLayout.scale), columns=\(panelLayout.columnCount), rows=\(panelLayout.rowCount)")
-
         // Always create or recreate panel with new size
         if floatingPanel != nil {
             floatingPanel?.close()
@@ -1099,7 +1053,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             defaults.set(3, forKey: "panelRows")
         }
         defaults.synchronize()
-        NSLog("DEBUG: panelColumns=\(defaults.integer(forKey: "panelColumns")), panelRows=\(defaults.integer(forKey: "panelRows"))")
 
         sinks = [
             spaceModel.objectWillChange.sink{_ in self.refreshBar()},

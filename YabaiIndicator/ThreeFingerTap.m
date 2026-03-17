@@ -52,7 +52,6 @@ void startThreeFingerTapMonitor(ThreeFingerTapCallback callback) {
                                 NULL);
 
     if (eventTap == nil) {
-        NSLog(@"Failed to create event tap for three-finger tap detection");
         return;
     }
 

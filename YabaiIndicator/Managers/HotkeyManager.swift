@@ -26,11 +26,9 @@ class CarbonHotkey {
         )
 
         if status != noErr {
-            NSLog("Failed to register Carbon hotkey \(id): \(status)")
             return false
         }
 
-        NSLog("Registered Carbon hotkey \(id): keyCode=\(keyCode), modifiers=\(modifiers)")
         return true
     }
 }
@@ -133,7 +131,6 @@ class ComposableHotkey {
             },
             userInfo: userData
         ) else {
-            NSLog("Failed to create event tap for hotkey \(binding.id)")
             return
         }
 
@@ -141,14 +138,6 @@ class ComposableHotkey {
         runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-
-        let triggerDesc: String
-        switch binding.trigger {
-        case .immediate: triggerDesc = "immediate"
-        case .tap(let t): triggerDesc = "tap(\(t)s)"
-        case .release: triggerDesc = "release"
-        }
-        NSLog("Registered event tap hotkey \(binding.id): keyCode=\(binding.keyCode), modifiers=\(binding.modifiers), trigger=\(triggerDesc)")
     }
 
     private func handleEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
