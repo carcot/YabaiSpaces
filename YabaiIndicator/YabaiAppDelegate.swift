@@ -569,14 +569,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         prefsItem.target = self
         menu.addItem(prefsItem)
 
-        let toggleItem = NSMenuItem(
-            title: "Toggle Button Style",
-            action: #selector(toggleButtonStyle),
-            keyEquivalent: ""
-        )
-        toggleItem.target = self
-        menu.addItem(toggleItem)
-
         menu.addItem(NSMenuItem.separator())
 
         let quitItem = NSMenuItem(
@@ -1029,6 +1021,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         // Create status bar item if enabled
         if UserDefaults.standard.showMenubar {
             statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+            statusBarItem?.menu = createMenu()
             refreshButtonStyle()
         }
 
