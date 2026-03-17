@@ -52,6 +52,14 @@ extension UserDefaults {
     @objc dynamic var showPanel: Bool {
         return bool(forKey: "showPanel")
     }
+
+    @objc dynamic var panelColumns: Int {
+        return integer(forKey: "panelColumns")
+    }
+
+    @objc dynamic var panelRows: Int {
+        return integer(forKey: "panelRows")
+    }
 }
 
 class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
@@ -1047,8 +1055,13 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     func updatePanelLayout() {
         let screenHeight = NSScreen.main?.frame.height ?? 1080
         let baseScale = PanelLayout.scale(from: screenHeight)
+
+        // Read grid size from UserDefaults (with defaults if not set)
+        let columns = max(1, min(12, UserDefaults.standard.integer(forKey: "panelColumns")))
+        let rows = max(1, min(6, UserDefaults.standard.integer(forKey: "panelRows")))
+
         // Always use 3x scale for floating panel
-        panelLayout = PanelLayout(scale: baseScale * 3)
+        panelLayout = PanelLayout(scale: baseScale * 3, columnCount: columns, rowCount: rows)
 
         // Clear thumbnail cache so new size is used
         gThumbnailCache.clear()
@@ -1056,7 +1069,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         // Save to UserDefaults so PanelContentView can read it
         panelLayout.save()
 
-        NSLog("PanelLayout updated: scale=\(panelLayout.scale), baseScale=\(baseScale)")
+        NSLog("PanelLayout updated: scale=\(panelLayout.scale), columns=\(panelLayout.columnCount), rows=\(panelLayout.rowCount)")
 
         // Always create or recreate panel with new size
         if floatingPanel != nil {
@@ -1078,7 +1091,9 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             UserDefaults.standard.publisher(for: \.buttonStyle).sink {_ in self.refreshButtonStyle()},
             UserDefaults.standard.publisher(for: \.gridPosition).sink {_ in self.updateHotkeyPosition()},
             UserDefaults.standard.publisher(for: \.showMenubar).sink {_ in self.updateMenubarVisibility()},
-            UserDefaults.standard.publisher(for: \.showPanel).sink {_ in self.updatePanelHotkeys()}
+            UserDefaults.standard.publisher(for: \.showPanel).sink {_ in self.updatePanelHotkeys()},
+            UserDefaults.standard.publisher(for: \.panelColumns).sink {_ in self.updatePanelLayout()},
+            UserDefaults.standard.publisher(for: \.panelRows).sink {_ in self.updatePanelLayout()}
         ]
 
         // Calculate panel layout FIRST (before any views are created)

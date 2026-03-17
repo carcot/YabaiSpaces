@@ -18,5 +18,9 @@
 	<integer>2</integer>
 	<key>saveRestoreCursor</key>
 	<true/>
+	<key>panelColumns</key>
+	<integer>4</integer>
+	<key>panelRows</key>
+	<integer>2</integer>
 </dict>
 </plist>

@@ -29,6 +29,8 @@ struct SettingsView : View {
     @AppStorage("gridPosition") private var gridPosition = GridPosition.atCursor
     @AppStorage("cursorPosition") private var cursorPosition = CursorPosition.onThumbnail
     @AppStorage("saveRestoreCursor") private var saveRestoreCursor = true
+    @AppStorage("panelColumns") private var panelColumns = 4
+    @AppStorage("panelRows") private var panelRows = 2
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -68,6 +70,39 @@ struct SettingsView : View {
                 // Spaces Grid Section
                 Toggle("Show Spaces Grid", isOn: $showPanel)
                     .padding(.leading, 16)
+
+                HStack(spacing: 16) {
+                    // Grid Columns Picker
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Columns")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.secondary)
+                        Picker("", selection: $panelColumns) {
+                            ForEach(3...8, id: \.self) { cols in
+                                Text("\(cols)").tag(cols)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 140)
+                    }
+                    .padding(.leading, 32)
+
+                    // Grid Rows Picker
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Rows")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.secondary)
+                        Picker("", selection: $panelRows) {
+                            ForEach(2...4, id: \.self) { rows in
+                                Text("\(rows)").tag(rows)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 140)
+                    }
+                }
+                .disabled(!showPanel)
+                .opacity(showPanel ? 1 : 0.4)
 
                 Picker("Grid Position", selection: $gridPosition) {
                     Text("Centered").tag(GridPosition.centered)

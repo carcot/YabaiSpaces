@@ -12,38 +12,45 @@ struct PanelLayout {
     /// Scale factor (1.0 = default, larger = bigger UI)
     let scale: CGFloat
 
-    /// Create layout with explicit scale
-    init(scale: CGFloat) {
+    /// Number of columns in the grid (default 4)
+    let columnCount: Int
+
+    /// Number of rows in the grid (default 2)
+    let rowCount: Int
+
+    /// Create layout with explicit parameters
+    init(scale: CGFloat, columnCount: Int = 4, rowCount: Int = 2) {
         self.scale = scale
+        self.columnCount = max(1, min(12, columnCount))  // Clamp to reasonable range
+        self.rowCount = max(1, min(6, rowCount))        // Clamp to reasonable range
     }
 
-    /// Create layout reading scale from UserDefaults
+    /// Create layout reading scale and grid size from UserDefaults
     init(from defaults: UserDefaults = .standard) {
         let storedScale = defaults.float(forKey: "panelScale")
         self.scale = storedScale > 0 ? CGFloat(storedScale) : 1.0
+        self.columnCount = max(1, min(12, defaults.integer(forKey: "panelColumns")))
+        self.rowCount = max(1, min(6, defaults.integer(forKey: "panelRows")))
     }
 
-    /// Create layout with default scale (1.0)
+    /// Create layout with default scale (1.0) and default grid size (4x2)
     init() {
         self.scale = 1.0
+        self.columnCount = 4
+        self.rowCount = 2
     }
 
-    /// Save current scale to UserDefaults
+    /// Save current layout parameters to UserDefaults
     func save(to defaults: UserDefaults = .standard) {
         defaults.set(Float(scale), forKey: "panelScale")
+        defaults.set(columnCount, forKey: "panelColumns")
+        defaults.set(rowCount, forKey: "panelRows")
     }
 
     // MARK: - Grid Layout
     var columns: [GridItem] {
-        [
-            GridItem(.fixed(columnWidth), spacing: columnSpacing),
-            GridItem(.fixed(columnWidth), spacing: columnSpacing),
-            GridItem(.fixed(columnWidth), spacing: columnSpacing),
-            GridItem(.fixed(columnWidth), spacing: columnSpacing)
-        ]
+        Array(repeating: GridItem(.fixed(columnWidth), spacing: columnSpacing), count: columnCount)
     }
-
-    var columnCount: Int { 4 }
 
     // MARK: - Dimensions (scaled from base values)
     var columnWidth: CGFloat { 32 * scale }
@@ -66,7 +73,7 @@ struct PanelLayout {
     // MARK: - Panel Size
     var panelSize: CGSize {
         let contentWidth = CGFloat(columnCount) * columnWidth + CGFloat(columnCount - 1) * columnSpacing
-        let contentHeight = buttonHeight * 2 + rowSpacing // Default 2 rows
+        let contentHeight = buttonHeight * CGFloat(rowCount) + rowSpacing * CGFloat(rowCount - 1)
         return CGSize(
             width: contentWidth + padding * 2,
             height: contentHeight + padding * 2
