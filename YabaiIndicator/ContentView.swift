@@ -68,7 +68,7 @@ struct WindowSpaceButton : View {
                 // Calculate frame size proportional to display aspect ratio
                 let aspect = display.frame.width / display.frame.height
                 let frameSize = CGSize(width: layout.baseImageHeight * aspect, height: layout.baseImageHeight)
-                Image(nsImage: generateImage(active: space.active, visible: space.visible, windows: windows, display: display, scale: layout.scale)).onTapGesture {
+                Image(nsImage: generateHybridPreviewImage(active: space.active, visible: space.visible, windows: windows, display: display, scale: layout.scale)).onTapGesture {
                     switchSpace()
                 }.frame(width: frameSize.width, height: frameSize.height)
             } else {
