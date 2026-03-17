@@ -48,6 +48,7 @@ struct SettingsView : View {
                 Picker("Button Style", selection: $buttonStyleRaw) {
                     Text("Numeric").tag(ButtonStyle.numeric.rawValue)
                     Text("Windows").tag(ButtonStyle.windows.rawValue)
+                    Text("Thumbnail").tag(ButtonStyle.thumbnail.rawValue)
                 }
                 .pickerStyle(.segmented)
                 .padding(.leading, 32)
