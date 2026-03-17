@@ -51,6 +51,14 @@ extension UserDefaults {
             return CursorPosition(rawValue: self.integer(forKey: "cursorPosition")) ?? .onThumbnail
         }
     }
+
+    @objc dynamic var showMenubar: Bool {
+        return bool(forKey: "showMenubar")
+    }
+
+    @objc dynamic var showPanel: Bool {
+        return bool(forKey: "showPanel")
+    }
 }
 
 class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
@@ -777,7 +785,39 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         hasSetupHotkeys = false  // Reset to allow re-registration
         setupDefaultHotkeys()
     }
-    
+
+    func updateMenubarVisibility() {
+        let show = UserDefaults.standard.showMenubar
+        if show {
+            // Create status bar item if it doesn't exist
+            if statusBarItem == nil {
+                statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+                refreshButtonStyle()
+            }
+            statusBarItem?.isVisible = true
+        } else {
+            // Remove status bar item
+            if let item = statusBarItem {
+                NSStatusBar.system.removeStatusItem(item)
+                statusBarItem = nil
+            }
+        }
+    }
+
+    func updatePanelHotkeys() {
+        let show = UserDefaults.standard.showPanel
+        if show {
+            // Register hotkeys if not already registered
+            if !hasSetupHotkeys {
+                setupDefaultHotkeys()
+            }
+        } else {
+            // Unregister all hotkeys
+            HotkeyManager.shared.unregisterAll()
+            hasSetupHotkeys = false
+        }
+    }
+
     func socketServer() async {
         do {
             let socket = try Socket.create(family: .unix, type: .stream, proto: .unix)
@@ -972,8 +1012,9 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             UserDefaults.standard.publisher(for: \.showDisplaySeparator).sink {_ in self.refreshBar()},
             UserDefaults.standard.publisher(for: \.showCurrentSpaceOnly).sink {_ in self.refreshBar()},
             UserDefaults.standard.publisher(for: \.menubarButtonStyle).sink {_ in self.refreshButtonStyle()},
-            UserDefaults.standard.publisher(for: \.gridPosition).sink {_ in self.updateHotkeyPosition()}
-
+            UserDefaults.standard.publisher(for: \.gridPosition).sink {_ in self.updateHotkeyPosition()},
+            UserDefaults.standard.publisher(for: \.showMenubar).sink {_ in self.updateMenubarVisibility()},
+            UserDefaults.standard.publisher(for: \.showPanel).sink {_ in self.updatePanelHotkeys()}
         ]
 
         // Calculate panel layout FIRST (before any views are created)
@@ -985,13 +1026,17 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             await self?.socketServer()
         }
 
-        // Create status bar item (for menu access)
-        statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        // Create status bar item if enabled
+        if UserDefaults.standard.showMenubar {
+            statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+            refreshButtonStyle()
+        }
 
-        // Set up default hotkeys
-        setupDefaultHotkeys()
+        // Set up hotkeys if panel is enabled
+        if UserDefaults.standard.showPanel {
+            setupDefaultHotkeys()
+        }
 
-        refreshButtonStyle()
         registerObservers()
     }
 }
