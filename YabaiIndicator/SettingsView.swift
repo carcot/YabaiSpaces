@@ -82,8 +82,7 @@ struct SettingsView : View {
                                 Text("\(cols)").tag(cols)
                             }
                         }
-                        .pickerStyle(.segmented)
-                        .frame(width: 140)
+                        .frame(width: 100)
                     }
                     .padding(.leading, 32)
 
@@ -97,8 +96,7 @@ struct SettingsView : View {
                                 Text("\(rows)").tag(rows)
                             }
                         }
-                        .pickerStyle(.segmented)
-                        .frame(width: 140)
+                        .frame(width: 100)
                     }
                 }
                 .disabled(!showPanel)
