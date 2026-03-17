@@ -24,7 +24,7 @@ struct SettingsView : View {
     @AppStorage("showDisplaySeparator") private var showDisplaySeparator = true
     @AppStorage("showCurrentSpaceOnly") private var showCurrentSpaceOnly = false
 
-    @AppStorage("menubarButtonStyle") private var menubarButtonStyle = ButtonStyle.numeric
+    @AppStorage("buttonStyle") private var buttonStyleRaw = ButtonStyle.windows.rawValue
 
     @AppStorage("gridPosition") private var gridPosition = GridPosition.atCursor
     @AppStorage("cursorPosition") private var cursorPosition = CursorPosition.onThumbnail
@@ -45,9 +45,9 @@ struct SettingsView : View {
                     .padding(.leading, 32)
                     .disabled(!showMenubar)
                     .opacity(showMenubar ? 1 : 0.4)
-                Picker("Button Style", selection: $menubarButtonStyle) {
-                    Text("Numeric").tag(ButtonStyle.numeric)
-                    Text("Windows").tag(ButtonStyle.windows)
+                Picker("Button Style", selection: $buttonStyleRaw) {
+                    Text("Numeric").tag(ButtonStyle.numeric.rawValue)
+                    Text("Windows").tag(ButtonStyle.windows.rawValue)
                 }
                 .pickerStyle(.segmented)
                 .padding(.leading, 32)

@@ -29,14 +29,7 @@ extension UserDefaults {
 
     @objc dynamic var buttonStyle: ButtonStyle {
         get {
-            // For backward compatibility, read from menubarButtonStyle
-            return ButtonStyle(rawValue: self.integer(forKey: "menubarButtonStyle")) ?? ButtonStyle.windows
-        }
-    }
-
-    @objc dynamic var menubarButtonStyle: ButtonStyle {
-        get {
-            return ButtonStyle(rawValue: self.integer(forKey: "menubarButtonStyle")) ?? ButtonStyle.windows
+            return ButtonStyle(rawValue: self.integer(forKey: "buttonStyle")) ?? .windows
         }
     }
 
@@ -151,7 +144,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     }
 
     func onWindowRefresh() {
-        let menubarButtonStyle = UserDefaults.standard.menubarButtonStyle
+        let buttonStyle = UserDefaults.standard.buttonStyle
 
         // Always query windows for panel (hybrid preview needs window outlines)
         // regardless of menubar button style
@@ -589,14 +582,14 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
     @objc
     func toggleButtonStyle() {
-        let currentStyle = UserDefaults.standard.menubarButtonStyle
+        let currentStyle = UserDefaults.standard.buttonStyle
         let newStyle: ButtonStyle
         switch currentStyle {
         case .numeric: newStyle = .windows
         case .windows: newStyle = .numeric
         default: newStyle = .numeric
         }
-        UserDefaults.standard.set(newStyle.rawValue, forKey: "menubarButtonStyle")
+        UserDefaults.standard.set(newStyle.rawValue, forKey: "buttonStyle")
     }
 
     // MARK: - Panel Keyboard Navigation
@@ -1003,7 +996,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             spaceModel.objectWillChange.sink{_ in self.refreshBar()},
             UserDefaults.standard.publisher(for: \.showDisplaySeparator).sink {_ in self.refreshBar()},
             UserDefaults.standard.publisher(for: \.showCurrentSpaceOnly).sink {_ in self.refreshBar()},
-            UserDefaults.standard.publisher(for: \.menubarButtonStyle).sink {_ in self.refreshButtonStyle()},
+            UserDefaults.standard.publisher(for: \.buttonStyle).sink {_ in self.refreshButtonStyle()},
             UserDefaults.standard.publisher(for: \.gridPosition).sink {_ in self.updateHotkeyPosition()},
             UserDefaults.standard.publisher(for: \.showMenubar).sink {_ in self.updateMenubarVisibility()},
             UserDefaults.standard.publisher(for: \.showPanel).sink {_ in self.updatePanelHotkeys()}

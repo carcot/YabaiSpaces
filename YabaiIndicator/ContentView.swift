@@ -196,7 +196,7 @@ struct ContentView: View {
     @EnvironmentObject var spaceModel: SpaceModel
     @AppStorage("showDisplaySeparator") private var showDisplaySeparator = true
     @AppStorage("showCurrentSpaceOnly") private var showCurrentSpaceOnly = false
-    @AppStorage("menubarButtonStyle") private var menubarButtonStyle: ButtonStyle = .windows
+    @AppStorage("buttonStyle") private var buttonStyleRaw = ButtonStyle.windows.rawValue
 
     var layout: PanelLayout { PanelLayout(from: UserDefaults.standard) }
 
@@ -218,10 +218,11 @@ struct ContentView: View {
     }
 
     var body: some View {
-        LazyVGrid(columns: layout.columns, spacing: layout.rowSpacing) {
-            if menubarButtonStyle == .numeric || spaceModel.displays.count > 0 {
+        let buttonStyle = ButtonStyle(rawValue: buttonStyleRaw) ?? .windows
+        return LazyVGrid(columns: layout.columns, spacing: layout.rowSpacing) {
+            if buttonStyle == .numeric || spaceModel.displays.count > 0 {
                 ForEach(generateSpaces(), id: \.self) {space in
-                    switch menubarButtonStyle {
+                    switch buttonStyle {
                     case .numeric:
                         SpaceButton(space: space, layout: layout)
                     case .windows:
@@ -241,8 +242,7 @@ struct MenubarView: View {
     @EnvironmentObject var spaceModel: SpaceModel
     @AppStorage("showDisplaySeparator") private var showDisplaySeparator = true
     @AppStorage("showCurrentSpaceOnly") private var showCurrentSpaceOnly = false
-    // Read from menubarButtonStyle for compatibility
-    @AppStorage("menubarButtonStyle") private var menubarButtonStyle: ButtonStyle = .windows
+    @AppStorage("buttonStyle") private var buttonStyleRaw = ButtonStyle.windows.rawValue
 
     private func generateSpaces() -> [Space] {
         var shownSpaces:[Space] = []
@@ -262,10 +262,11 @@ struct MenubarView: View {
     }
 
     var body: some View {
-        HStack(spacing: 4) {
-            if menubarButtonStyle == .numeric || spaceModel.displays.count > 0 {
+        let buttonStyle = ButtonStyle(rawValue: buttonStyleRaw) ?? .windows
+        return HStack(spacing: 4) {
+            if buttonStyle == .numeric || spaceModel.displays.count > 0 {
                 ForEach(generateSpaces(), id: \.self) { space in
-                    switch menubarButtonStyle {
+                    switch buttonStyle {
                     case .numeric:
                         SpaceButton(space: space)
                     case .windows:
@@ -283,7 +284,7 @@ struct MenubarView: View {
 // Legacy StatusBarView (no longer used - kept for reference)
 struct StatusBarView: View {
     @EnvironmentObject var spaceModel: SpaceModel
-    @AppStorage("menubarButtonStyle") private var menubarButtonStyle: ButtonStyle = .windows
+    @AppStorage("buttonStyle") private var buttonStyleRaw = ButtonStyle.windows.rawValue
 
     var body: some View {
         HStack(spacing: 2) {

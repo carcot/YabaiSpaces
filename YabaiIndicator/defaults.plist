@@ -6,7 +6,7 @@
 	<true/>
 	<key>showPanel</key>
 	<true/>
-	<key>menubarButtonStyle</key>
+	<key>buttonStyle</key>
 	<integer>1</integer>
 	<key>showDisplaySeparator</key>
 	<true/>
