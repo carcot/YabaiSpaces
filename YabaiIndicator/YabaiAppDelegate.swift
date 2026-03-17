@@ -924,17 +924,15 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     }
 
     func refreshButtonStyle() {
-        // PanelContentView uses @AppStorage so it updates automatically - no need to replace contentView
-
         // Update status bar - show current space(s)
         for subView in statusBarItem?.button?.subviews ?? [] {
             subView.removeFromSuperview()
         }
 
-        // Create a simple view showing current space for status bar
-        let statusBarView = NSHostingView(rootView: StatusBarView().environmentObject(spaceModel))
-        statusBarView.setFrameSize(NSSize(width: 60, height: statusBarHeight))
-        statusBarItem?.button?.addSubview(statusBarView)
+        // Use dedicated MenubarView (simple state, no panel conflicts)
+        let menubarView = NSHostingView(rootView: MenubarView().environmentObject(spaceModel))
+        menubarView.setFrameSize(NSSize(width: 0, height: statusBarHeight))
+        statusBarItem?.button?.addSubview(menubarView)
 
         // Always clear cache when button style changes - thumbnails will be captured on space switch
         gThumbnailCache.clear()

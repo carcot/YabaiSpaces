@@ -235,20 +235,63 @@ struct ContentView: View {
     }
 }
 
-// Simplified view for status bar - shows current space(s)
+// Dedicated menubar view - matches original pre-panel ContentView
+// This can be easily merged with upstream if needed
+struct MenubarView: View {
+    @EnvironmentObject var spaceModel: SpaceModel
+    @AppStorage("showDisplaySeparator") private var showDisplaySeparator = true
+    @AppStorage("showCurrentSpaceOnly") private var showCurrentSpaceOnly = false
+    // Read from menubarButtonStyle for compatibility
+    @AppStorage("menubarButtonStyle") private var menubarButtonStyle: ButtonStyle = .windows
+
+    private func generateSpaces() -> [Space] {
+        var shownSpaces:[Space] = []
+        var lastDisplay = 0
+        for space in spaceModel.spaces {
+            if lastDisplay > 0 && space.display != lastDisplay {
+                if showDisplaySeparator {
+                    shownSpaces.append(Space(spaceid: 0, uuid: "", visible: true, active: false, display: 0, index: 0, yabaiIndex: 0, type: .divider))
+                }
+            }
+            if space.visible || !showCurrentSpaceOnly{
+                shownSpaces.append(space)
+            }
+            lastDisplay = space.display
+        }
+        return shownSpaces
+    }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if menubarButtonStyle == .numeric || spaceModel.displays.count > 0 {
+                ForEach(generateSpaces(), id: \.self) { space in
+                    switch menubarButtonStyle {
+                    case .numeric:
+                        SpaceButton(space: space)
+                    case .windows:
+                        WindowSpaceButton(space: space, windows: spaceModel.windows.filter{$0.spaceIndex == space.yabaiIndex}, displays: spaceModel.displays)
+                    case .thumbnail:
+                        // Thumbnail style not in original - fall back to windows
+                        WindowSpaceButton(space: space, windows: spaceModel.windows.filter{$0.spaceIndex == space.yabaiIndex}, displays: spaceModel.displays)
+                    }
+                }
+            }
+        }.padding(2)
+    }
+}
+
+// Legacy StatusBarView (no longer used - kept for reference)
 struct StatusBarView: View {
     @EnvironmentObject var spaceModel: SpaceModel
+    @AppStorage("menubarButtonStyle") private var menubarButtonStyle: ButtonStyle = .windows
 
     var body: some View {
         HStack(spacing: 2) {
-            Text("YI")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(.white)
-            ForEach(spaceModel.spaces.prefix(3).filter({ $0.visible }), id: \.self) { space in
+            ForEach(spaceModel.spaces.filter({ $0.visible }), id: \.self) { space in
                 if space.type == .standard {
                     Text("\(space.index)")
-                        .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.7))
+                        .font(.system(size: 11, weight: space.active ? .bold : .regular))
+                        .foregroundColor(.white)
                 }
             }
         }
