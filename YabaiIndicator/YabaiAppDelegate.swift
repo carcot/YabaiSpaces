@@ -1082,6 +1082,16 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         if let prefs = Bundle.main.path(forResource: "defaults", ofType: "plist"),
             let dict = NSDictionary(contentsOfFile: prefs) as? [String : Any] {
           UserDefaults.standard.register(defaults: dict)
+
+          // Ensure grid defaults are actually written to UserDefaults
+          // (register() only sets in-memory defaults, @AppStorage needs persisted values)
+          let defaults = UserDefaults.standard
+          if !defaults.dictionaryRepresentation().keys.contains("panelColumns") {
+              defaults.set(4, forKey: "panelColumns")
+          }
+          if !defaults.dictionaryRepresentation().keys.contains("panelRows") {
+              defaults.set(3, forKey: "panelRows")
+          }
         }
 
         sinks = [
