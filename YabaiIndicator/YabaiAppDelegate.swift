@@ -1083,15 +1083,18 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             let dict = NSDictionary(contentsOfFile: prefs) as? [String : Any] {
           UserDefaults.standard.register(defaults: dict)
 
-          // Ensure grid defaults are actually written to UserDefaults
+          // Ensure grid defaults are actually written to persistent UserDefaults
           // (register() only sets in-memory defaults, @AppStorage needs persisted values)
           let defaults = UserDefaults.standard
-          if !defaults.dictionaryRepresentation().keys.contains("panelColumns") {
+          // Check if values are actually persisted (not just registered)
+          if defaults.object(forKey: "panelColumns") == nil {
               defaults.set(4, forKey: "panelColumns")
           }
-          if !defaults.dictionaryRepresentation().keys.contains("panelRows") {
+          if defaults.object(forKey: "panelRows") == nil {
               defaults.set(3, forKey: "panelRows")
           }
+          // Force immediate write to disk
+          defaults.synchronize()
         }
 
         sinks = [
