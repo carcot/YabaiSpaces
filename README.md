@@ -1,6 +1,6 @@
 <div align="center">
     <img src="docs/appicon.png" width="200" height="200">
-    <h1>YabaiIndicator</h1>
+    <h1>YabaiSpaces</h1>
     <p>
         <b>Clickable spaces switcher powered by Yabai</b>
     </p>
