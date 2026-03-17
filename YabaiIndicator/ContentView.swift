@@ -93,6 +93,7 @@ struct ThumbnailSpaceButton : View {
     var displays: [Display]
     var layout: PanelLayout = PanelLayout()
     var isSelected: Bool = false  // Keyboard selection state
+    var borderScale: CGFloat = 1.0  // Scale factor for border thickness (0.5 for menubar)
     @State private var thumbnail: NSImage?
     @State private var thumbnailSpaceId: UInt64 = 0  // Track which space this thumbnail belongs to
 
@@ -117,6 +118,8 @@ struct ThumbnailSpaceButton : View {
                     // Only show thumbnail if it matches current space spaceid
                     if let thumbnail = thumbnail, thumbnailSpaceId == space.spaceid {
                         Image(nsImage: thumbnail)
+                            .resizable()
+                            .scaledToFill()
                     } else {
                         // Show hybrid preview (desktop + window outlines) for unvisited spaces
                         Image(nsImage: generateHybridPreviewImage(active: space.active, visible: space.visible, windows: windows, display: display, scale: layout.scale))
@@ -128,8 +131,10 @@ struct ThumbnailSpaceButton : View {
                     ZStack {
                         // Border: accent when active or selected, secondary gray otherwise
                         // Thickness: 3px when active, 2px when selected inactive, 1px when inactive
+                        // (scaled by borderScale for thinner menubar borders)
                         let isAccent = space.active || isSelected
-                        let thickness: CGFloat = space.active ? 3 : (isSelected ? 2 : 1)
+                        let baseThickness: CGFloat = space.active ? 3 : (isSelected ? 2 : 1)
+                        let thickness = baseThickness * borderScale
 
                         RoundedRectangle(cornerRadius: 0)
                             .inset(by: -thickness / 2)
@@ -272,8 +277,7 @@ struct MenubarView: View {
                     case .windows:
                         WindowSpaceButton(space: space, windows: spaceModel.windows.filter{$0.spaceIndex == space.yabaiIndex}, displays: spaceModel.displays)
                     case .thumbnail:
-                        // Thumbnail style not in original - fall back to windows
-                        WindowSpaceButton(space: space, windows: spaceModel.windows.filter{$0.spaceIndex == space.yabaiIndex}, displays: spaceModel.displays)
+                        ThumbnailSpaceButton(space: space, windows: spaceModel.windows.filter{$0.spaceIndex == space.yabaiIndex}, displays: spaceModel.displays, layout: PanelLayout(), borderScale: 0.5)
                     }
                 }
             }

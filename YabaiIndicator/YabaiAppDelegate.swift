@@ -72,7 +72,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     private var hasSetupHotkeys = false
 
     let statusBarHeight: CGFloat = 22
-    let itemWidth: CGFloat = 30
     let panelPadding: CGFloat = 8
 
     // Panel layout - scale calculated from screen height
@@ -157,14 +156,65 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     func refreshBar() {
         let showDisplaySeparator = UserDefaults.standard.bool(forKey: "showDisplaySeparator")
         let showCurrentSpaceOnly = UserDefaults.standard.bool(forKey: "showCurrentSpaceOnly")
+        let buttonStyle = UserDefaults.standard.buttonStyle
 
-        let numButtons = showCurrentSpaceOnly ?  spaceModel.displays.count : spaceModel.spaces.count
+        // Calculate width based on actual button sizes (matches MenubarView rendering)
+        // MenubarView uses scale 1.0, not the panel's 3x scale
+        let menubarLayout = PanelLayout(scale: 1.0)
+        let buttonSpacing: CGFloat = 4
+        let menubarPadding: CGFloat = 2  // from MenubarView .padding(2)
 
-        var newWidth = CGFloat(numButtons) * itemWidth
-        if !showDisplaySeparator {
-            newWidth -= CGFloat((spaceModel.displays.count - 1) * 10)
+        var contentWidth: CGFloat = 0
+        var buttonCount = 0
+        var lastDisplay = 0
+
+        for space in spaceModel.spaces {
+            // Add divider between displays if enabled
+            if lastDisplay > 0 && space.display != lastDisplay {
+                if showDisplaySeparator {
+                    // Divider is a thin line - contributes minimal width
+                    contentWidth += 1
+                }
+            }
+
+            // Filter spaces based on showCurrentSpaceOnly
+            if space.visible || !showCurrentSpaceOnly {
+                switch space.type {
+                case .standard:
+                    if buttonStyle == .numeric {
+                        // Numeric buttons: fixed width from menubar PanelLayout.imageSize.width
+                        contentWidth += menubarLayout.imageSize.width
+                    } else {
+                        // Windows/thumbnail: width = baseImageHeight × aspect ratio
+                        let displayIndex = space.display - 1
+                        if displayIndex >= 0 && displayIndex < spaceModel.displays.count {
+                            let display = spaceModel.displays[displayIndex]
+                            let aspect = display.frame.width / display.frame.height
+                            contentWidth += menubarLayout.baseImageHeight * aspect
+                        } else {
+                            // Fallback to numeric width if display data invalid
+                            contentWidth += menubarLayout.imageSize.width
+                        }
+                    }
+                case .fullscreen:
+                    // Fullscreen buttons always use numeric style
+                    contentWidth += menubarLayout.imageSize.width
+                case .divider:
+                    // Divider width handled above
+                    break
+                }
+                buttonCount += 1
+            }
+            lastDisplay = space.display
         }
-        newWidth += panelPadding * 2
+
+        // Add spacing between buttons
+        if buttonCount > 0 {
+            contentWidth += CGFloat(buttonCount - 1) * buttonSpacing
+        }
+
+        // Add menubar padding (2px on each side)
+        let newWidth = contentWidth + menubarPadding * 2
 
         // Update status bar width (floating panel has fixed size)
         statusBarItem?.button?.frame.size.width = newWidth
