@@ -19,7 +19,7 @@ struct PanelLayout {
     let rowCount: Int
 
     /// Create layout with explicit parameters
-    init(scale: CGFloat, columnCount: Int = 4, rowCount: Int = 2) {
+    init(scale: CGFloat, columnCount: Int = 4, rowCount: Int = 3) {
         self.scale = scale
         self.columnCount = max(1, min(12, columnCount))  // Clamp to reasonable range
         self.rowCount = max(1, min(6, rowCount))        // Clamp to reasonable range
@@ -33,11 +33,11 @@ struct PanelLayout {
         self.rowCount = max(1, min(6, defaults.integer(forKey: "panelRows")))
     }
 
-    /// Create layout with default scale (1.0) and default grid size (4x2)
+    /// Create layout with default scale (1.0) and default grid size (4x3)
     init() {
         self.scale = 1.0
         self.columnCount = 4
-        self.rowCount = 2
+        self.rowCount = 3
     }
 
     /// Save current layout parameters to UserDefaults

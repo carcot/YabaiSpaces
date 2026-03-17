@@ -30,7 +30,7 @@ struct SettingsView : View {
     @AppStorage("cursorPosition") private var cursorPosition = CursorPosition.onThumbnail
     @AppStorage("saveRestoreCursor") private var saveRestoreCursor = true
     @AppStorage("panelColumns") private var panelColumns = 4
-    @AppStorage("panelRows") private var panelRows = 2
+    @AppStorage("panelRows") private var panelRows = 3
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
