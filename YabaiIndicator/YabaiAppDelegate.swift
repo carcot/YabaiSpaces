@@ -60,6 +60,10 @@ extension UserDefaults {
     @objc dynamic var panelRows: Int {
         return integer(forKey: "panelRows")
     }
+
+    @objc dynamic var panelGridAuto: Bool {
+        return bool(forKey: "panelGridAuto")
+    }
 }
 
 class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
@@ -1056,9 +1060,49 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         let screenHeight = NSScreen.main?.frame.height ?? 1080
         let baseScale = PanelLayout.scale(from: screenHeight)
 
-        // Read grid size from UserDefaults (with defaults if not set)
-        let columns = max(1, min(12, UserDefaults.standard.integer(forKey: "panelColumns")))
-        let rows = max(1, min(6, UserDefaults.standard.integer(forKey: "panelRows")))
+        // Auto-calculate grid size based on current space layout (if enabled)
+        let autoSize = UserDefaults.standard.bool(forKey: "panelGridAuto")
+        var columns: Int
+        var rows: Int
+
+        if autoSize {
+            // Calculate total slots needed
+            let showDisplaySeparator = UserDefaults.standard.bool(forKey: "showDisplaySeparator")
+            var totalSlots = spaceModel.spaces.count
+            if showDisplaySeparator && spaceModel.displays.count > 1 {
+                totalSlots += spaceModel.displays.count - 1  // Add dividers
+            }
+
+            // Determine optimal columns based on screen width and total slots
+            let screenWidth = NSScreen.main?.frame.width ?? 1920
+            let isWideScreen = screenWidth >= 1920
+
+            // Heuristic: prefer wider layouts on wide screens, cap at reasonable limits
+            if totalSlots <= 6 {
+                columns = totalSlots
+            } else if isWideScreen {
+                // Wide screens: prefer 5-6 columns for many spaces
+                columns = min(6, max(4, Int(Double(totalSlots).squareRoot().rounded())))
+            } else {
+                // Standard screens: prefer 4-5 columns
+                columns = min(5, max(3, Int(Double(totalSlots).squareRoot().rounded())))
+            }
+
+            // Calculate rows needed
+            rows = (totalSlots + columns - 1) / columns  // Ceiling division
+
+            // Clamp to reasonable limits
+            columns = max(3, min(8, columns))
+            rows = max(2, min(5, rows))
+
+            // Save calculated values for display in settings (but keep auto flag enabled)
+            UserDefaults.standard.set(columns, forKey: "panelColumns")
+            UserDefaults.standard.set(rows, forKey: "panelRows")
+        } else {
+            // Read manual grid size from UserDefaults
+            columns = max(1, min(12, UserDefaults.standard.integer(forKey: "panelColumns")))
+            rows = max(1, min(6, UserDefaults.standard.integer(forKey: "panelRows")))
+        }
 
         // Always use 3x scale for floating panel
         panelLayout = PanelLayout(scale: baseScale * 3, columnCount: columns, rowCount: rows)
@@ -1069,7 +1113,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         // Save to UserDefaults so PanelContentView can read it
         panelLayout.save()
 
-        NSLog("PanelLayout updated: scale=\(panelLayout.scale), columns=\(panelLayout.columnCount), rows=\(panelLayout.rowCount)")
+        NSLog("PanelLayout updated: scale=\(panelLayout.scale), columns=\(panelLayout.columnCount), rows=\(panelLayout.rowCount), auto=\(autoSize)")
 
         // Always create or recreate panel with new size
         if floatingPanel != nil {
@@ -1092,9 +1136,26 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             UserDefaults.standard.publisher(for: \.gridPosition).sink {_ in self.updateHotkeyPosition()},
             UserDefaults.standard.publisher(for: \.showMenubar).sink {_ in self.updateMenubarVisibility()},
             UserDefaults.standard.publisher(for: \.showPanel).sink {_ in self.updatePanelHotkeys()},
-            UserDefaults.standard.publisher(for: \.panelColumns).sink {_ in self.updatePanelLayout()},
-            UserDefaults.standard.publisher(for: \.panelRows).sink {_ in self.updatePanelLayout()}
+            UserDefaults.standard.publisher(for: \.panelGridAuto).sink {_ in self.updatePanelLayout()},
+            UserDefaults.standard.publisher(for: \.panelColumns).sink {_ in
+                // Disable auto-size when user manually adjusts columns
+                UserDefaults.standard.set(false, forKey: "panelGridAuto")
+                self.updatePanelLayout()
+            },
+            UserDefaults.standard.publisher(for: \.panelRows).sink {_ in
+                // Disable auto-size when user manually adjusts rows
+                UserDefaults.standard.set(false, forKey: "panelGridAuto")
+                self.updatePanelLayout()
+            }
         ]
+
+        // Recalculate panel layout when spaces change (if auto-size is enabled)
+        NotificationCenter.default.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            if UserDefaults.standard.bool(forKey: "panelGridAuto") {
+                self.updatePanelLayout()
+            }
+        }
 
         // Calculate panel layout FIRST (before any views are created)
         // This ensures UserDefaults has the correct scale before views read it

@@ -6,7 +6,7 @@
 	<true/>
 	<key>showPanel</key>
 	<true/>
-	<key>buttonStyle</key>
+	<key>menubarButtonStyle</key>
 	<integer>1</integer>
 	<key>showDisplaySeparator</key>
 	<true/>
@@ -18,11 +18,5 @@
 	<integer>2</integer>
 	<key>saveRestoreCursor</key>
 	<true/>
-	<key>panelGridAuto</key>
-	<true/>
-	<key>panelColumns</key>
-	<integer>4</integer>
-	<key>panelRows</key>
-	<integer>3</integer>
 </dict>
 </plist>

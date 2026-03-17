@@ -29,6 +29,7 @@ struct SettingsView : View {
     @AppStorage("gridPosition") private var gridPosition = GridPosition.atCursor
     @AppStorage("cursorPosition") private var cursorPosition = CursorPosition.onThumbnail
     @AppStorage("saveRestoreCursor") private var saveRestoreCursor = true
+    @AppStorage("panelGridAuto") private var panelGridAuto = true
     @AppStorage("panelColumns") private var panelColumns = 4
     @AppStorage("panelRows") private var panelRows = 3
 
@@ -71,6 +72,11 @@ struct SettingsView : View {
                 Toggle("Show Spaces Grid", isOn: $showPanel)
                     .padding(.leading, 16)
 
+                Toggle("Auto-size Grid", isOn: $panelGridAuto)
+                    .padding(.leading, 32)
+                    .disabled(!showPanel)
+                    .opacity(showPanel ? 1 : 0.4)
+
                 HStack(spacing: 16) {
                     // Grid Columns Picker
                     VStack(alignment: .leading, spacing: 4) {
@@ -92,15 +98,15 @@ struct SettingsView : View {
                             .font(.system(size: 10, weight: .medium))
                             .foregroundColor(.secondary)
                         Picker("", selection: $panelRows) {
-                            ForEach(2...4, id: \.self) { rows in
+                            ForEach(2...5, id: \.self) { rows in
                                 Text("\(rows)").tag(rows)
                             }
                         }
                         .frame(width: 100)
                     }
                 }
-                .disabled(!showPanel)
-                .opacity(showPanel ? 1 : 0.4)
+                .disabled(!showPanel || panelGridAuto)
+                .opacity((showPanel && !panelGridAuto) ? 1 : 0.4)
 
                 Picker("Grid Position", selection: $gridPosition) {
                     Text("Centered").tag(GridPosition.centered)
