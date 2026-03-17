@@ -554,6 +554,16 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     func showPanelMenu(at location: NSPoint) {
         let menu = NSMenu()
 
+        let aboutItem = NSMenuItem(
+            title: "About",
+            action: #selector(showAbout),
+            keyEquivalent: ""
+        )
+        aboutItem.target = self
+        menu.addItem(aboutItem)
+
+        menu.addItem(NSMenuItem.separator())
+
         let prefsItem = NSMenuItem(
             title: "Preferences...",
             action: #selector(openPreferences),
@@ -834,7 +844,21 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     func quit() {
         NSApp.terminate(self)
     }
-    
+
+    @objc
+    func showAbout() {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
+        let message = "YabaiIndicator\nVersion \(version) (Build \(build))\n\nA menu bar indicator for Yabai spaces."
+
+        let alert = NSAlert()
+        alert.messageText = "About YabaiIndicator"
+        alert.informativeText = message
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+
     @objc
     func openPreferences() {
         // Get panel position before hiding (for centering preferences over panel)
@@ -891,6 +915,11 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     
     func createMenu() -> NSMenu {
         let statusBarMenu = NSMenu()
+        statusBarMenu.addItem(
+            withTitle: "About",
+            action: #selector(showAbout),
+            keyEquivalent: "")
+        statusBarMenu.addItem(NSMenuItem.separator())
         statusBarMenu.addItem(
             withTitle: "Preferences",
             action: #selector(openPreferences),

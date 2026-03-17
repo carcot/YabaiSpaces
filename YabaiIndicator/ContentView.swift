@@ -374,6 +374,10 @@ struct PanelContentView: View {
             }
         }
         .contextMenu {
+            Button("About") {
+                appDelegate.showAbout()
+            }
+            Divider()
             Button("Preferences...") {
                 NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
                 NSApp.activate(ignoringOtherApps: true)
