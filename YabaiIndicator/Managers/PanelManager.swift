@@ -83,14 +83,14 @@ class PanelManager: NSObject {
         panel.makeKeyAndOrderFront(nil)
         startClickOutsideMonitor()
 
-        // Handle cursor movement modifiers
-        switch modifiers {
-        case .none:
+        // Handle cursor positioning based on user preferences
+        switch UserDefaults.standard.cursorPosition {
+        case .stayPut:
             break
-        case .moveCursorToPanel:
-            moveCursorToActiveThumbnail()
-        case .moveCursorToGridCenter:
+        case .centerGrid:
             moveCursorToGridCenter()
+        case .onThumbnail:
+            moveCursorToActiveThumbnail()
         }
     }
 
