@@ -18,6 +18,12 @@ class KeyPanel: NSPanel {
     }
 }
 
+// Policy for cursor restoration when panel closes
+enum CursorRestorationPolicy {
+    case restore    // Restore cursor to saved position when panel closes
+    case skip       // Don't restore cursor (user clicked elsewhere or switched spaces)
+}
+
 extension UserDefaults {
     @objc dynamic var showDisplaySeparator: Bool {
         return bool(forKey: "showDisplaySeparator")
@@ -74,7 +80,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
     // Save/restore cursor position when panel opens/closes
     private var savedCursorPosition: NSPoint?
-    private var hideWithoutRestore = false  // Don't restore cursor after space selection
+    private var cursorRestorationPolicy = CursorRestorationPolicy.restore
 
     // Ensure hotkeys are only set up once (Combine publisher may fire during init)
     private var hasSetupHotkeys = false
@@ -150,8 +156,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     }
 
     func onWindowRefresh() {
-        let buttonStyle = UserDefaults.standard.buttonStyle
-
         // Always query windows for panel (hybrid preview needs window outlines)
         // regardless of menubar button style
         let windows = gYabaiClient.queryWindows()
@@ -257,7 +261,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         guard let panel = floatingPanel else { return }
 
         // Save cursor position for restoration when panel closes (if enabled)
-        hideWithoutRestore = false
+        cursorRestorationPolicy = .restore
         if UserDefaults.standard.bool(forKey: "saveRestoreCursor") {
             saveCursorPosition()
         }
@@ -375,7 +379,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLoc) }) ?? NSScreen.main else { return }
 
         // Save cursor position for restoration when panel closes (if enabled)
-        hideWithoutRestore = false
+        cursorRestorationPolicy = .restore
         if UserDefaults.standard.bool(forKey: "saveRestoreCursor") {
             saveCursorPosition()
         }
@@ -514,8 +518,8 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         floatingPanel?.orderOut(nil)
         stopClickOutsideMonitor()
 
-        // Restore cursor AFTER panel is hidden (if enabled and unless hiding after space selection)
-        if !hideWithoutRestore && UserDefaults.standard.bool(forKey: "saveRestoreCursor") {
+        // Restore cursor AFTER panel is hidden (if enabled and unless policy says skip)
+        if cursorRestorationPolicy == .restore && UserDefaults.standard.bool(forKey: "saveRestoreCursor") {
             restoreCursorPosition()
         }
     }
@@ -537,7 +541,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             }
             // Left-click: let the click pass through first, then hide
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                self?.hideWithoutRestore = true  // Don't restore cursor when clicking outside
+                self?.cursorRestorationPolicy = .skip  // Don't restore cursor when clicking outside
                 self?.hidePanel()
             }
             return event
@@ -569,7 +573,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         // Global monitor for clicks in other apps - hide on any click
         // Note: This may cause benign Mach port warnings in logs when accessing events from other processes
         let globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
-            self?.hideWithoutRestore = true  // Don't restore cursor when clicking outside
+            self?.cursorRestorationPolicy = .skip  // Don't restore cursor when clicking outside
             self?.hidePanel()
         }
 
@@ -665,7 +669,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         let maxIndex = spaces.count - 1
 
         // Initialize selection to active space if none selected
-        var currentIndex = panelSelectedIndex ?? {
+        let currentIndex = panelSelectedIndex ?? {
             if let activeSpace = spaces.firstIndex(where: { $0.active }) {
                 return activeSpace
             }
@@ -891,7 +895,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         let panelFrame = floatingPanel?.frame
 
         // Hide panel immediately without restoring cursor
-        hideWithoutRestore = true
+        cursorRestorationPolicy = .skip
         hidePanel()
 
         NSApp.activate(ignoringOtherApps: true)
@@ -970,7 +974,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         gYabaiClient.focusSpace(index: yabaiIndex)
 
         // Hide panel after switch (don't restore cursor - we're on a new desktop)
-        hideWithoutRestore = true
+        cursorRestorationPolicy = .skip
         hidePanel()
 
         // Capture thumbnail of the NEW space after switching (panel is now hidden)
