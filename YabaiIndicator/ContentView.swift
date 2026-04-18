@@ -61,10 +61,9 @@ struct WindowSpaceButton : View {
     var body : some View {
         switch space.type {
         case .standard:
-            // Safely get display, fallback to a default Display if index is invalid
+            // Safely get display by index property, not array position
             let displayIndex = space.display - 1
-            if displayIndex >= 0 && displayIndex < displays.count {
-                let display = displays[displayIndex]
+            if let display = displays.first(where: { $0.index == displayIndex }) {
                 // Calculate frame size proportional to display aspect ratio
                 let aspect = display.frame.width / display.frame.height
                 let frameSize = CGSize(width: layout.baseImageHeight * aspect, height: layout.baseImageHeight)
@@ -105,8 +104,9 @@ struct ThumbnailSpaceButton : View {
 
     // Find which window was clicked at the given position (in thumbnail coordinates)
     func findWindowAt(position: CGPoint, thumbnailSize: CGSize, displayIndex: Int) -> UInt64? {
-        guard displayIndex >= 0, displayIndex < displays.count else { return nil }
-        let targetDisplay = displays[displayIndex]
+        guard displayIndex >= 0 else { return nil }
+        // Find display by its index property, not array position
+        guard let targetDisplay = displays.first(where: { $0.index == displayIndex }) else { return nil }
 
         // Get thumbnail bounds (thumbnail may be clipped to aspect ratio)
         let displayAspect = targetDisplay.frame.width / targetDisplay.frame.height
@@ -158,8 +158,7 @@ struct ThumbnailSpaceButton : View {
         case .standard:
             let displayIndex = space.display - 1
 
-            if displayIndex >= 0 && displayIndex < displays.count {
-                let display = displays[displayIndex]
+            if let display = displays.first(where: { $0.index == displayIndex }) {
                 // Calculate thumbnail size proportional to display aspect ratio
                 let aspect = display.frame.width / display.frame.height
                 let targetSize = CGSize(width: layout.baseImageHeight * aspect, height: layout.baseImageHeight)

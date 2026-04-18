@@ -49,7 +49,9 @@ class PanelManager: NSObject {
         let hostingView = NSHostingView(rootView: PanelContentView().environmentObject(spaceModel))
         hostingView.wantsLayer = true
         hostingView.layer?.cornerRadius = 6
-        hostingView.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.95).cgColor
+        hostingView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.8).cgColor
+        hostingView.layer?.borderWidth = 2
+        hostingView.layer?.borderColor = NSColor.white.withAlphaComponent(0.3).cgColor
         panel.contentView = hostingView
 
         self.panel = panel
