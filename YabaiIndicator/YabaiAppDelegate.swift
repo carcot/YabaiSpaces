@@ -611,8 +611,8 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(self.onDisplayChanged(_:)), name: Notification.Name("NSWorkspaceActiveDisplayDidChangeNotification"), object: nil)
     }
 
-    // Switch spaces
-    func switchSpace(to yabaiIndex: Int) {
+    // Switch spaces, optionally focusing a specific window
+    func switchSpace(to yabaiIndex: Int, focusWindowId: UInt64? = nil) {
         // Perform the space switch
         gYabaiClient.focusSpace(index: yabaiIndex)
 
@@ -636,6 +636,11 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             // (macOS sometimes misreports active status, especially for spaces with empty UUIDs)
             if let newActive = spaceElems.first(where: { $0.yabaiIndex == yabaiIndex }) {
                 self.captureThumbnail(for: newActive)
+            }
+
+            // Focus specific window if requested
+            if let windowId = focusWindowId {
+                gYabaiClient.focusWindow(id: windowId)
             }
         }
     }

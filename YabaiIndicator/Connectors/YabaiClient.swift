@@ -51,6 +51,11 @@ class YabaiClient {
             "-m", "space", "--focus", "\(index)")
     }
 
+    func focusWindow(id: UInt64) {
+        yabaiSocketCall(
+            "-m", "window", "--focus", "\(id)")
+    }
+
     func queryWindows() -> [Window] {
         if let r = yabaiSocketCall("-m", "query", "--windows").response as? [[String: Any]] {
             let windows = r.compactMap{Window(id: $0["id"] as! UInt64, pid: $0["pid"] as! UInt64, app: $0["app"] as! String, title: $0["title"] as! String, frame: NSRect(x: ($0["frame"] as! [String:Double])["x"]!, y: ($0["frame"] as! [String:Double])["y"]!, width: ($0["frame"] as! [String:Double])["w"]!, height: ($0["frame"] as! [String:Double])["h"]!), displayIndex: $0["display"] as! Int, spaceIndex: $0["space"] as! Int)}

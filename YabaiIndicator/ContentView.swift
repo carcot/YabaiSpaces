@@ -97,10 +97,60 @@ struct ThumbnailSpaceButton : View {
     @State private var thumbnail: NSImage?
     @State private var thumbnailSpaceId: UInt64 = 0  // Track which space this thumbnail belongs to
 
-    func switchSpace() {
+    func switchSpace(focusWindowId: UInt64? = nil) {
         if !space.active && space.yabaiIndex > 0 {
-            appDelegate.switchSpace(to: space.yabaiIndex)
+            appDelegate.switchSpace(to: space.yabaiIndex, focusWindowId: focusWindowId)
         }
+    }
+
+    // Find which window was clicked at the given position (in thumbnail coordinates)
+    func findWindowAt(position: CGPoint, thumbnailSize: CGSize, displayIndex: Int) -> UInt64? {
+        guard displayIndex >= 0, displayIndex < displays.count else { return nil }
+        let targetDisplay = displays[displayIndex]
+
+        // Get thumbnail bounds (thumbnail may be clipped to aspect ratio)
+        let displayAspect = targetDisplay.frame.width / targetDisplay.frame.height
+        let thumbnailAspect = thumbnailSize.width / thumbnailSize.height
+
+        var usableRect: CGRect
+        if thumbnailAspect > displayAspect {
+            // Thumbnail is wider - letterbox on sides
+            let usableWidth = thumbnailSize.height * displayAspect
+            usableRect = CGRect(x: (thumbnailSize.width - usableWidth) / 2,
+                               y: 0,
+                               width: usableWidth,
+                               height: thumbnailSize.height)
+        } else {
+            // Thumbnail is taller - letterbox on top/bottom
+            let usableHeight = thumbnailSize.width / displayAspect
+            usableRect = CGRect(x: 0,
+                               y: (thumbnailSize.height - usableHeight) / 2,
+                               width: thumbnailSize.width,
+                               height: usableHeight)
+        }
+
+        // Check if click is within usable area
+        guard usableRect.contains(position) else { return nil }
+
+        // Map click position to display coordinates
+        let relativeX = (position.x - usableRect.minX) / usableRect.width
+        let relativeY = (position.y - usableRect.minY) / usableRect.height
+
+        // macOS displays are in a global coordinate system where (0,0) is bottom-left
+        // But thumbnail rendering typically uses top-left origin
+        // We need to flip Y for comparison with window frames
+        let displayX = relativeX * targetDisplay.frame.width
+        let displayY = targetDisplay.frame.height - (relativeY * targetDisplay.frame.height)
+
+        // Check which window contains this point
+        for window in windows where window.spaceIndex == space.yabaiIndex {
+            let windowFrame = window.frame
+            if windowFrame.contains(CGPoint(x: displayX, y: displayY)) {
+                return window.id
+            }
+        }
+
+        return nil
     }
 
     var body: some View {
@@ -165,7 +215,13 @@ struct ThumbnailSpaceButton : View {
                     loadThumbnail(for: space, display: display, windows: windows, size: targetSize)
                 }
                 .frame(width: targetSize.width, height: targetSize.height)
-                .onTapGesture { switchSpace() }
+                .gesture(
+                    DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                        .onEnded { value in
+                            let windowId = findWindowAt(position: value.startLocation, thumbnailSize: targetSize, displayIndex: space.display - 1)
+                            switchSpace(focusWindowId: windowId)
+                        }
+                )
             } else {
                 Image(nsImage: generateImage(active: space.active, visible: space.visible, windows: windows, display: displays[0], scale: layout.scale))
                     .onTapGesture { switchSpace() }
