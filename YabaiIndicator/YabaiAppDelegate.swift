@@ -609,6 +609,11 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     func registerObservers() {
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(self.onSpaceChanged(_:)), name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(self.onDisplayChanged(_:)), name: Notification.Name("NSWorkspaceActiveDisplayDidChangeNotification"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.onOpenPreferencesNotification(_:)), name: NSNotification.Name("OpenPreferences"), object: nil)
+    }
+
+    @objc func onOpenPreferencesNotification(_ notification: Notification) {
+        openPreferences()
     }
 
     // Switch spaces, optionally focusing a specific window

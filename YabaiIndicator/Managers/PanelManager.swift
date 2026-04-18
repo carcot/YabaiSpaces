@@ -328,7 +328,8 @@ class PanelManager: NSObject {
     }
 
     @objc private func openPreferences() {
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        // Post notification to open preferences (handled by YabaiAppDelegate)
+        NotificationCenter.default.post(name: NSNotification.Name("OpenPreferences"), object: nil)
     }
 
     @objc private func quit() {
