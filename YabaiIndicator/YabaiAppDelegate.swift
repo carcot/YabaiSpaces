@@ -537,6 +537,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             }
             // Left-click: let the click pass through first, then hide
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                self?.hideWithoutRestore = true  // Don't restore cursor when clicking outside
                 self?.hidePanel()
             }
             return event
@@ -568,6 +569,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         // Global monitor for clicks in other apps - hide on any click
         // Note: This may cause benign Mach port warnings in logs when accessing events from other processes
         let globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
+            self?.hideWithoutRestore = true  // Don't restore cursor when clicking outside
             self?.hidePanel()
         }
 
