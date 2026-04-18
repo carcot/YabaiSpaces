@@ -21,11 +21,10 @@ enum PanelHotkeyAction: Equatable {
 }
 
 /// Additional behaviors to apply after showing panel
-struct PanelModifiers: Equatable {
-    let moveMouseToCenter: Bool
-
-    static let none = PanelModifiers(moveMouseToCenter: false)
-    static let moveMouseToCenter = PanelModifiers(moveMouseToCenter: true)
+enum PanelModifiers: Equatable {
+    case none
+    case moveCursorToPanel
+    case moveCursorToGridCenter
 }
 
 /// When the hotkey action should fire

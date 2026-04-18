@@ -69,18 +69,22 @@ extension UserDefaults {
 }
 
 class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
-    var floatingPanel: NSPanel?
     var settingsWindow: NSWindow?
     var statusBarItem: NSStatusItem?
     var application: NSApplication = NSApplication.shared
     var spaceModel = SpaceModel()
 
+    // Panel manager
+    private var panelManager: PanelManager!
+
+    // MARK: PanelHotkeyDelegate
+
+    var floatingPanel: NSPanel? {
+        return panelManager?.panel
+    }
+
     // Track last active space for thumbnail capture
     private var lastActiveSpaceId: UInt64 = 0
-
-    // Save/restore cursor position when panel opens/closes
-    private var savedCursorPosition: NSPoint?
-    private var cursorRestorationPolicy = CursorRestorationPolicy.restore
 
     // Ensure hotkeys are only set up once (Combine publisher may fire during init)
     private var hasSetupHotkeys = false
@@ -93,7 +97,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
     var sinks: [AnyCancellable?] = []
     var receiverQueue = DispatchQueue(label: "yabai-indicator.socket.receiver")
-    var eventMonitors: [Any] = []
 
     @objc
     func onSpaceChanged(_ notification: Notification) {
@@ -232,394 +235,41 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         statusBarItem?.button?.subviews[0].frame.size.width = newWidth
     }
 
-    func createFloatingPanel() {
-        let panelSize = panelLayout.panelSize
-        let panel = KeyPanel(
-            contentRect: NSRect(x: 0, y: 0, width: panelSize.width, height: panelSize.height),
-            styleMask: [.nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        panel.level = .floating
-        panel.isFloatingPanel = true
-        panel.backgroundColor = .clear
-        panel.isOpaque = false
-        panel.hasShadow = true
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.becomesKeyOnlyIfNeeded = false
-
-        let hostingView = NSHostingView(rootView: PanelContentView().environmentObject(spaceModel))
-        hostingView.wantsLayer = true
-        hostingView.layer?.cornerRadius = 6
-        hostingView.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.95).cgColor
-        panel.contentView = hostingView
-
-        floatingPanel = panel
-    }
-
     func showPanel(at mouseLocation: NSPoint, modifiers: PanelModifiers = .none) {
-        guard let panel = floatingPanel else { return }
-
-        // Save cursor position for restoration when panel closes (if enabled)
-        cursorRestorationPolicy = .restore
-        if UserDefaults.standard.bool(forKey: "saveRestoreCursor") {
-            saveCursorPosition()
-        }
-
         // Capture current space thumbnail before showing panel
-        // TODO: Make this configurable via preferences (instant show vs fresh thumbnails)
-        // Latency: ~140-150ms, tested as acceptable
         if let currentSpace = spaceModel.spaces.first(where: { $0.active }) {
             captureThumbnail(for: currentSpace)
         }
 
-        let panelSize = panel.frame.size
-
-        if UserDefaults.standard.gridPosition == .centered {
-            // Center panel on screen containing cursor
-            let mouseLoc = NSEvent.mouseLocation
-            if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLoc) }) ?? NSScreen.main {
-                let visibleFrame = screen.visibleFrame
-                let x = visibleFrame.midX - panelSize.width / 2
-                let y = visibleFrame.midY - panelSize.height / 2
-                panel.setFrameOrigin(NSPoint(x: x, y: y))
-            }
-        } else {
-            // Position panel with thumbnail at cursor
-            // Panel always shows ALL spaces (including dividers)
-            let showDisplaySeparator = UserDefaults.standard.bool(forKey: "showDisplaySeparator")
-
-            var activeGridIndex = 0
-            var lastDisplay = 0
-
-            for space in spaceModel.spaces {
-                // Add divider before new display (if enabled) - dividers take a grid slot
-                if lastDisplay > 0 && space.display != lastDisplay && showDisplaySeparator {
-                    activeGridIndex += 1
-                }
-
-                // Panel shows all spaces, count every space
-                if space.active {
-                    break
-                }
-                activeGridIndex += 1
-                lastDisplay = space.display
-            }
-
-        // Grid layout from PanelLayout
-        let columns = panelLayout.columnCount
-        let columnWidth = panelLayout.columnWidth
-        let columnSpacing = panelLayout.columnSpacing
-        let buttonHeight = panelLayout.buttonHeight
-        let rowSpacing = panelLayout.rowSpacing
-        let padding = panelLayout.padding
-
-        let row = activeGridIndex / columns
-        let col = activeGridIndex % columns
-
-        // Calculate center of the active space button within the panel
-        let buttonCenterX = padding + CGFloat(col) * (columnWidth + columnSpacing) + columnWidth / 2
-        let buttonCenterY = panelSize.height - (padding + CGFloat(row) * (buttonHeight + rowSpacing) + buttonHeight / 2)
-
-        // Position panel so mouse is over the active space button
-        var newX = mouseLocation.x - buttonCenterX
-        var newY = mouseLocation.y - buttonCenterY
-
-        // Keep panel on screen - get the screen containing the mouse
-        if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) ?? NSScreen.main {
-            let visibleFrame = screen.visibleFrame
-            let panelFrame = NSRect(x: newX, y: newY, width: panelSize.width, height: panelSize.height)
-
-            // Adjust horizontally if off screen
-            if panelFrame.minX < visibleFrame.minX {
-                newX = visibleFrame.minX
-            } else if panelFrame.maxX > visibleFrame.maxX {
-                newX = visibleFrame.maxX - panelSize.width
-            }
-
-            // Adjust vertically if off screen
-            if panelFrame.minY < visibleFrame.minY {
-                newY = visibleFrame.minY
-            } else if panelFrame.maxY > visibleFrame.maxY {
-                newY = visibleFrame.maxY - panelSize.height
-            }
-        }
-
-        panel.setFrameOrigin(NSPoint(x: newX, y: newY))
-        }
-
-        // Reset keyboard selection to active space
-        resetPanelSelection()
-
-        panel.orderFrontRegardless()
-        panel.makeKey()
-
-        // Don't activate the app - it interferes with other windows like Settings
-        // NSApp.activate(ignoringOtherApps: true)
-
-        // Start monitoring for clicks outside
-        startClickOutsideMonitor()
-
-        // Handle cursor positioning based on settings
+        // Map CursorPosition to PanelModifiers
+        let panelModifiers: PanelModifiers
         switch UserDefaults.standard.cursorPosition {
         case .stayPut:
-            break // Don't move cursor
+            panelModifiers = .none
         case .centerGrid:
-            moveCursorToPanelGridCenter()
+            panelModifiers = .moveCursorToGridCenter
         case .onThumbnail:
-            moveMouseToPanelCenter()
+            panelModifiers = .moveCursorToPanel
         }
+
+        panelManager.show(at: mouseLocation, modifiers: panelModifiers)
+        resetPanelSelection()
     }
 
     func showPanelCentered(modifiers: PanelModifiers = .none) {
-        guard let panel = floatingPanel else { return }
-
-        // Use the screen containing the cursor
         let mouseLoc = NSEvent.mouseLocation
-        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLoc) }) ?? NSScreen.main else { return }
-
-        // Save cursor position for restoration when panel closes (if enabled)
-        cursorRestorationPolicy = .restore
-        if UserDefaults.standard.bool(forKey: "saveRestoreCursor") {
-            saveCursorPosition()
-        }
 
         // Capture current space thumbnail before showing panel
         if let currentSpace = spaceModel.spaces.first(where: { $0.active }) {
             captureThumbnail(for: currentSpace)
         }
 
-        let panelSize = panel.frame.size
-        let visibleFrame = screen.visibleFrame
-
-        // Center panel in visible frame
-        let x = visibleFrame.midX - panelSize.width / 2
-        let y = visibleFrame.midY - panelSize.height / 2
-
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
-
+        panelManager.show(at: mouseLoc, modifiers: modifiers)
         resetPanelSelection()
-        panel.orderFrontRegardless()
-        panel.makeKey()
-
-        startClickOutsideMonitor()
-
-        // Move cursor based on cursorPosition setting
-        let cursorPosition = UserDefaults.standard.cursorPosition
-        switch cursorPosition {
-        case .stayPut:
-            break
-        case .centerGrid:
-            moveCursorToPanelGridCenter()
-        case .onThumbnail:
-            moveMouseToPanelCenter()
-        }
-    }
-
-    private func moveMouseToPanelCenter() {
-        guard let panel = floatingPanel else { return }
-
-        // Find the current active space's thumbnail position within the panel
-        // Panel always shows ALL spaces (including dividers)
-        let showDisplaySeparator = UserDefaults.standard.bool(forKey: "showDisplaySeparator")
-
-        var activeGridIndex = 0
-        var lastDisplay = 0
-
-        for space in spaceModel.spaces {
-            // Add divider before new display (if enabled) - dividers take a grid slot
-            if lastDisplay > 0 && space.display != lastDisplay && showDisplaySeparator {
-                activeGridIndex += 1
-            }
-
-            // Panel shows all spaces, count every space
-            if space.active {
-                break
-            }
-            activeGridIndex += 1
-            lastDisplay = space.display
-        }
-
-        // Calculate thumbnail center position (same logic as panel layout)
-        let columns = panelLayout.columnCount
-        let columnWidth = panelLayout.columnWidth
-        let columnSpacing = panelLayout.columnSpacing
-        let buttonHeight = panelLayout.buttonHeight
-        let rowSpacing = panelLayout.rowSpacing
-        let padding = panelLayout.padding
-
-        let row = activeGridIndex / columns
-        let col = activeGridIndex % columns
-
-        // Thumbnail center relative to panel origin (bottom-left)
-        let thumbnailCenterX = padding + CGFloat(col) * (columnWidth + columnSpacing) + columnWidth / 2
-        let thumbnailCenterY = panel.frame.height - (padding + CGFloat(row) * (buttonHeight + rowSpacing) + buttonHeight / 2)
-
-        // Convert to screen coordinates
-        let screenPoint = NSPoint(
-            x: panel.frame.origin.x + thumbnailCenterX,
-            y: panel.frame.origin.y + thumbnailCenterY
-        )
-
-        moveCursor(to: screenPoint)
-    }
-
-    private func moveCursorToPanelGridCenter() {
-        guard let panel = floatingPanel else { return }
-
-        // Move cursor to center of the panel
-        let panelSize = panel.frame.size
-        let panelCenterX = panel.frame.origin.x + panelSize.width / 2
-        let panelCenterY = panel.frame.origin.y + panelSize.height / 2
-        moveCursor(to: NSPoint(x: panelCenterX, y: panelCenterY))
-    }
-
-    private func moveCursorToScreenCenter() {
-        // Find the screen containing the cursor, or main screen as fallback
-        let mouseLoc = NSEvent.mouseLocation
-        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLoc) }) ?? NSScreen.main else { return }
-        let center = NSPoint(
-            x: screen.visibleFrame.midX,
-            y: screen.visibleFrame.midY
-        )
-        moveCursor(to: center)
-    }
-
-    private func saveCursorPosition() {
-        savedCursorPosition = NSEvent.mouseLocation
-    }
-
-    private func restoreCursorPosition() {
-        guard let saved = savedCursorPosition else { return }
-
-        // Flip Y coordinate for CGEvent (top-left origin)
-        guard let mainScreen = NSScreen.main else { return }
-        let flippedY = mainScreen.frame.height - saved.y
-        let flippedPoint = CGPoint(x: saved.x, y: flippedY)
-
-        if let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: flippedPoint, mouseButton: .left) {
-            event.post(tap: .cgSessionEventTap)
-        }
-        savedCursorPosition = nil
-    }
-
-    private func moveCursor(to point: NSPoint) {
-        // Try flipping Y coordinate (CGEvent might use top-left origin)
-        guard let mainScreen = NSScreen.main else { return }
-        let flippedY = mainScreen.frame.height - point.y
-        let flippedPoint = CGPoint(x: point.x, y: flippedY)
-
-        if let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: flippedPoint, mouseButton: .left) {
-            event.post(tap: .cgSessionEventTap)
-        }
     }
 
     func hidePanel() {
-        floatingPanel?.orderOut(nil)
-        stopClickOutsideMonitor()
-
-        // Restore cursor AFTER panel is hidden (if enabled and unless policy says skip)
-        if cursorRestorationPolicy == .restore && UserDefaults.standard.bool(forKey: "saveRestoreCursor") {
-            restoreCursorPosition()
-        }
-    }
-
-    func startClickOutsideMonitor() {
-        stopClickOutsideMonitor() // Remove any existing monitor
-
-        // Local monitor for clicks within our app - ONLY for panel interactions
-        let localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            // Only intercept clicks if panel is visible
-            guard let panel = self?.floatingPanel, panel.isVisible else {
-                return event  // Let all other clicks pass through normally
-            }
-
-            // Right-click (button=1 on macOS) shows menu
-            if event.buttonNumber == 1 {
-                self?.showPanelMenu(at: event.locationInWindow)
-                return nil  // Consume right-click
-            }
-            // Left-click: let the click pass through first, then hide
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                self?.cursorRestorationPolicy = .skip  // Don't restore cursor when clicking outside
-                self?.hidePanel()
-            }
-            return event
-        }
-
-        // Local monitor for Escape key to hide panel - ONLY when panel is visible
-        let keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            // Only handle keys if panel is visible
-            guard let panel = self?.floatingPanel, panel.isVisible else {
-                return event  // Let keys pass through normally
-            }
-
-            // Handle navigation keys for panel
-            let handled = self?.handlePanelKeyEvent(event) ?? false
-            if handled {
-                return nil  // Consume the event
-            }
-
-            return event
-        }
-
-        // Global monitor for Escape key - needed because panel is non-activating
-        let globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.keyCode == 53 {  // 53 = Escape
-                self?.hidePanel()
-            }
-        }
-
-        // Global monitor for clicks in other apps - hide on any click
-        // Note: This may cause benign Mach port warnings in logs when accessing events from other processes
-        let globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
-            self?.cursorRestorationPolicy = .skip  // Don't restore cursor when clicking outside
-            self?.hidePanel()
-        }
-
-        if let local = localMonitor { eventMonitors.append(local) }
-        if let key = keyMonitor { eventMonitors.append(key) }
-        if let globalKey = globalKeyMonitor { eventMonitors.append(globalKey) }
-        if let global = globalMonitor { eventMonitors.append(global) }
-    }
-
-    func showPanelMenu(at location: NSPoint) {
-        let menu = NSMenu()
-
-        let aboutItem = NSMenuItem(
-            title: "About",
-            action: #selector(showAbout),
-            keyEquivalent: ""
-        )
-        aboutItem.target = self
-        menu.addItem(aboutItem)
-
-        menu.addItem(NSMenuItem.separator())
-
-        let prefsItem = NSMenuItem(
-            title: "Preferences...",
-            action: #selector(openPreferences),
-            keyEquivalent: ""
-        )
-        prefsItem.target = self
-        menu.addItem(prefsItem)
-
-        menu.addItem(NSMenuItem.separator())
-
-        let quitItem = NSMenuItem(
-            title: "Quit YabaiIndicator",
-            action: #selector(quit),
-            keyEquivalent: "q"
-        )
-        quitItem.target = self
-        menu.addItem(quitItem)
-
-        // Show menu at the click location
-        // Note: NSMenu uses top-left origin, so we need to flip the Y coordinate
-        if let panel = floatingPanel, let contentView = panel.contentView {
-            let flippedLocation = NSPoint(x: location.x, y: contentView.frame.height - location.y)
-            menu.popUp(positioning: nil, at: flippedLocation, in: contentView)
-        }
+        panelManager?.hide()
     }
 
     @objc
@@ -747,13 +397,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         )
 
         return true
-    }
-
-    func stopClickOutsideMonitor() {
-        for monitor in eventMonitors {
-            NSEvent.removeMonitor(monitor)
-        }
-        eventMonitors.removeAll()
     }
 
     func setupDefaultHotkeys() {
@@ -895,7 +538,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         let panelFrame = floatingPanel?.frame
 
         // Hide panel immediately without restoring cursor
-        cursorRestorationPolicy = .skip
+        panelManager?.cursorRestorationPolicy = .skip
         hidePanel()
 
         NSApp.activate(ignoringOtherApps: true)
@@ -974,7 +617,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         gYabaiClient.focusSpace(index: yabaiIndex)
 
         // Hide panel after switch (don't restore cursor - we're on a new desktop)
-        cursorRestorationPolicy = .skip
+        panelManager?.cursorRestorationPolicy = .skip
         hidePanel()
 
         // Capture thumbnail of the NEW space after switching (panel is now hidden)
@@ -1031,11 +674,8 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         // Save to UserDefaults so PanelContentView can read it
         panelLayout.save()
 
-        // Always create or recreate panel with new size
-        if floatingPanel != nil {
-            floatingPanel?.close()
-        }
-        createFloatingPanel()
+        // Update panel with new layout
+        panelManager?.updateLayout(panelLayout)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -1075,6 +715,10 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         // Calculate panel layout FIRST (before any views are created)
         // This ensures UserDefaults has the correct scale before views read it
         updatePanelLayout()
+
+        // Initialize panel manager
+        panelManager = PanelManager(spaceModel: spaceModel, panelLayout: panelLayout)
+        _ = panelManager.createPanel()
 
         // Run socket server in background - suppress Sendable warning as this is intentional
         Task.detached(priority: .background) { [weak self] in
