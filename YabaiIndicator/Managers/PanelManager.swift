@@ -21,6 +21,9 @@ class PanelManager: NSObject {
     private var eventMonitors: [Any] = []
     var onPanelHide: (() -> Void)?
 
+    // Keyboard event delegate
+    weak var keyboardDelegate: PanelHotkeyDelegate?
+
     init(spaceModel: SpaceModel, panelLayout: PanelLayout) {
         self.spaceModel = spaceModel
         self.panelLayout = panelLayout
@@ -261,6 +264,23 @@ class PanelManager: NSObject {
             guard let panel = self?.panel, panel.isVisible else {
                 return event
             }
+            // Try to handle the key event through the delegate
+            if let delegate = self?.keyboardDelegate, delegate.handleKeyEvent(event) {
+                return nil  // Event was handled, don't propagate
+            }
+            return event
+        }
+
+        // Hide panel on scroll/gesture events (trackpad swipes, etc.)
+        let gestureMonitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .gesture, .swipe]) { [weak self] event in
+            guard let panel = self?.panel, panel.isVisible else {
+                return event
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self?.cursorRestorationPolicy = .skip
+                self?.hide()
+            }
             return event
         }
 
@@ -275,10 +295,17 @@ class PanelManager: NSObject {
             self?.hide()
         }
 
+        // Also monitor global gesture events (system-wide gestures like Mission Control)
+        let globalGestureMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.scrollWheel, .gesture, .swipe]) { [weak self] event in
+            self?.hide()
+        }
+
         if let local = localMonitor { eventMonitors.append(local) }
         if let key = keyMonitor { eventMonitors.append(key) }
+        if let gesture = gestureMonitor { eventMonitors.append(gesture) }
         if let globalKey = globalKeyMonitor { eventMonitors.append(globalKey) }
         if let global = globalMonitor { eventMonitors.append(global) }
+        if let globalGesture = globalGestureMonitor { eventMonitors.append(globalGesture) }
     }
 
     private func stopClickOutsideMonitor() {

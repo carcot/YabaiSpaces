@@ -35,6 +35,7 @@
 		5086FE87278303EE00E51F61 /* NativeClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5086FE86278303EE00E51F61 /* NativeClient.swift */; };
 		5086FE892783598E00E51F61 /* SpaceType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5086FE882783598E00E51F61 /* SpaceType.swift */; };
 		50DF24C7277BD18700DF1906 /* ImageGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50DF24C6277BD18700DF1906 /* ImageGenerator.swift */; };
+		A99146BA8BC740C692ACAA1D /* ButtonImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0571B345189346F5AB898168 /* ButtonImageCache.swift */; };
 		7592BA952F638A7400829D81 /* ThreeFingerTap.m in Sources */ = {isa = PBXBuildFile; fileRef = 7592BA942F638A2A00829D81 /* ThreeFingerTap.m */; };
 /* End PBXBuildFile section */
 
@@ -89,6 +90,7 @@
 		5086FE7D2782006C00E51F61 /* SocketClient.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SocketClient.h; sourceTree = "<group>"; };
 		5086FE7E2782006C00E51F61 /* SocketClient.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SocketClient.c; sourceTree = "<group>"; };
 		5086FE832783026C00E51F61 /* ButtonStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonStyle.swift; sourceTree = "<group>"; };
+		0571B345189346F5AB898168 /* ButtonImageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonImageCache.swift; sourceTree = "<group>"; };
 		5086FE86278303EE00E51F61 /* NativeClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeClient.swift; sourceTree = "<group>"; };
 		5086FE882783598E00E51F61 /* SpaceType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceType.swift; sourceTree = "<group>"; };
 		50DF24C6277BD18700DF1906 /* ImageGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageGenerator.swift; sourceTree = "<group>"; };
@@ -153,6 +155,7 @@
 		5061206A2779212000E8F192 /* YabaiIndicator */ = {
 			isa = PBXGroup;
 			children = (
+					0571B345189346F5AB898168 /* ButtonImageCache.swift */,
 				5086FE852783036900E51F61 /* Connectors */,
 				50HKMGRGR2779500000E8F192 /* Managers */,
 				5086FE822783024600E51F61 /* Models */,
@@ -396,6 +399,7 @@
 				5061206E2779212000E8F192 /* ContentView.swift in Sources */,
 				5061206C2779212000E8F192 /* YabaiIndicatorApp.swift in Sources */,
 				5086FE842783026C00E51F61 /* ButtonStyle.swift in Sources */,
+					A99146BA8BC740C692ACAA1D /* ButtonImageCache.swift in Sources */,
 				5051A4692780C02700614C85 /* YabaiClient.swift in Sources */,
 				5086FE7F2782006D00E51F61 /* SocketClient.c in Sources */,
 			);

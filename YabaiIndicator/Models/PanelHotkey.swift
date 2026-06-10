@@ -64,4 +64,5 @@ protocol PanelHotkeyDelegate: AnyObject {
     func showPanel(at position: NSPoint, modifiers: PanelModifiers)
     func showPanelCentered(modifiers: PanelModifiers)
     func hidePanel()
+    func handleKeyEvent(_ event: NSEvent) -> Bool
 }

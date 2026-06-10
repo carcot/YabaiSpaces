@@ -290,6 +290,12 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     static let panelNavigationNotification = Notification.Name("panelNavigation")
     private var panelSelectedIndex: Int? = nil
 
+    // MARK: PanelHotkeyDelegate - Keyboard Event Handling
+
+    func handleKeyEvent(_ event: NSEvent) -> Bool {
+        return handlePanelKeyEvent(event)
+    }
+
     func resetPanelSelection() {
         // Reset selection to active space and post notification
         let spaces = spaceModel.spaces.filter { $0.type == .standard }
@@ -728,6 +734,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
         // Initialize panel manager
         panelManager = PanelManager(spaceModel: spaceModel, panelLayout: panelLayout)
+        panelManager.keyboardDelegate = self
         _ = panelManager.createPanel()
 
         // Run socket server in background - suppress Sendable warning as this is intentional
@@ -748,5 +755,11 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         }
 
         registerObservers()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // Clear caches to free memory
+        gButtonImageCache.clear()
+        gThumbnailCache.clear()
     }
 }

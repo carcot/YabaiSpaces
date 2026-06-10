@@ -8,6 +8,8 @@
 import Foundation
 import Cocoa
 import CoreGraphics
+import ImageIO
+import UniformTypeIdentifiers
 
 // Private API function types
 typealias CGWindowListCreateImageFn = @convention(c) (CGRect, CFArray?, UInt32) -> CGImage?
@@ -16,9 +18,10 @@ typealias CGWindowListCreateImageFromRectFn = @convention(c) (CGRect, CFArray?, 
 class PrivateWindowCapture {
     private let captureQueue = DispatchQueue(label: "yabai-indicator.capture", qos: .userInitiated)
 
-    // Cached desktop images
-    private var cachedWallpaper: NSImage?
-    private var cacheVersion = 0  // Increment to invalidate caches
+    // Cached wallpaper PNG data (not CGImage to avoid retention leaks)
+    private var cachedWallpaperData: Data?
+    private var cachedWallpaperSize: CGSize?
+    private var cacheVersion = 0
 
     // Private API function pointers
     private var cgWindowListCreateImage: CGWindowListCreateImageFn?
@@ -122,7 +125,6 @@ class PrivateWindowCapture {
     /// Capture entire display content (desktop background)
     private func captureDisplay(displayID: CGDirectDisplayID, targetSize: CGSize) -> CGImage? {
         // Use CGWindowListCreateImage with nil window array to capture screen
-        // windowListOption 0 = include all windows (desktop + windows)
         if let cgWindowListCreateImage = cgWindowListCreateImage {
             let bounds = CGRect(origin: .zero, size: CGDisplayBounds(displayID).size)
             if let image = cgWindowListCreateImage(bounds, nil, 0) {
@@ -133,59 +135,89 @@ class PrivateWindowCapture {
     }
 
     /// Capture just the desktop wallpaper for a display (no windows)
-    /// Uses cached wallpaper if available
+    /// Returns NSImage for compatibility with existing code
     func captureDesktop(display: Display, targetSize: CGSize) -> NSImage? {
-        // Return cached wallpaper if available
-        if let wallpaper = cachedWallpaper {
-            // Check if cached size matches target size
-            if wallpaper.size == targetSize {
-                return wallpaper
-            } else {
-                // Need to resize
-                let scaled = NSImage(size: targetSize)
-                scaled.lockFocus()
-                wallpaper.draw(
-                    in: NSRect(origin: .zero, size: targetSize),
-                    from: NSRect(origin: .zero, size: wallpaper.size),
-                    operation: .copy,
-                    fraction: 1.0
-                )
-                scaled.unlockFocus()
-                return scaled
-            }
+        // Return cached wallpaper if size matches
+        if let data = cachedWallpaperData, cachedWallpaperSize == targetSize {
+            return NSImage(data: data)
         }
 
-        // Cache miss - read wallpaper from file
-        return loadWallpaper(targetSize: targetSize)
+        // Cache miss - load wallpaper from file and convert to PNG
+        if let cgImage = loadWallpaperCG(targetSize: targetSize) {
+            let pngData = cgImageToPNG(cgImage)
+            cachedWallpaperData = pngData
+            cachedWallpaperSize = targetSize
+            return NSImage(data: pngData)
+        }
+
+        return nil
+    }
+
+    /// Capture desktop wallpaper and return CGImage directly (avoid NSImage wrapper leak)
+    func captureDesktopCG(display: Display, targetSize: CGSize) -> CGImage? {
+        // Create CGImage from cached PNG data if size matches
+        if let data = cachedWallpaperData, cachedWallpaperSize == targetSize {
+            return cgImageFromPNG(data)
+        }
+
+        // Cache miss - load wallpaper from file and convert to PNG
+        if let cgImage = loadWallpaperCG(targetSize: targetSize) {
+            let pngData = cgImageToPNG(cgImage)
+            cachedWallpaperData = pngData
+            cachedWallpaperSize = targetSize
+            return cgImage
+        }
+
+        return nil
     }
 
     /// Clear caches (call when wallpaper changes or to free memory)
     func clearCaches() {
-        cachedWallpaper = nil
+        cachedWallpaperData = nil
+        cachedWallpaperSize = nil
         cacheVersion += 1
+    }
+
+    // MARK: - Private helpers
+
+    private func cgImageToPNG(_ cgImage: CGImage) -> Data {
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else {
+            return Data()
+        }
+        CGImageDestinationAddImage(destination, cgImage, nil)
+        CGImageDestinationFinalize(destination)
+        return data as Data
+    }
+
+    private func cgImageFromPNG(_ data: Data) -> CGImage? {
+        guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
+              let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
+            return nil
+        }
+        return cgImage
     }
 
     // MARK: - Private cache methods
 
-    private func loadWallpaper(targetSize: CGSize) -> NSImage? {
+    private func loadWallpaperCG(targetSize: CGSize) -> CGImage? {
         let workspace = NSWorkspace.shared
 
-        // Try to get wallpaper from any screen (same across all displays)
+        // Try to get wallpaper from any screen
         if let screen = NSScreen.main,
            let wallpaperURL = workspace.desktopImageURL(for: screen) {
-            if let wallpaper = NSImage(contentsOf: wallpaperURL) {
-                // Scale and cache
-                let scaled = NSImage(size: targetSize)
-                scaled.lockFocus()
-                wallpaper.draw(
-                    in: NSRect(origin: .zero, size: targetSize),
-                    from: NSRect(origin: .zero, size: wallpaper.size),
-                    operation: .copy,
-                    fraction: 1.0
-                )
-                scaled.unlockFocus()
-                cachedWallpaper = scaled
-                return scaled
+            if let imageSource = CGImageSourceCreateWithURL(wallpaperURL as CFURL, nil) {
+                // Load the image at full resolution
+                guard let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
+                    return nil
+                }
+
+                // Scale to target size if needed
+                if cgImage.width == Int(targetSize.width) && cgImage.height == Int(targetSize.height) {
+                    return cgImage
+                } else {
+                    return scaleImage(cgImage, to: targetSize)
+                }
             }
         }
 
@@ -195,40 +227,44 @@ class PrivateWindowCapture {
     /// Capture all windows for a space and composite them
     func captureSpace(windows: [Window], display: Display, targetSize: CGSize) -> NSImage? {
         captureQueue.sync {
-            let image = NSImage(size: targetSize)
-            image.lockFocus()
+            let rect = CGRect(origin: .zero, size: targetSize)
 
-            // Draw background color as fallback
-            NSColor.windowBackgroundColor.setFill()
-            NSRect(origin: .zero, size: targetSize).fill()
-
-            // Always capture and draw desktop wallpaper as background
-            if let displayID = getDisplayID(for: display.index),
-               let desktopImage = captureDisplay(displayID: displayID, targetSize: targetSize) {
-                let nsImage = NSImage(cgImage: desktopImage, size: targetSize)
-                nsImage.draw(in: NSRect(origin: .zero, size: targetSize))
+            guard let context = CGContext(
+                data: nil,
+                width: Int(targetSize.width),
+                height: Int(targetSize.height),
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
+            ) else {
+                return nil
             }
 
-            // Uniform scale - thumbnail now matches display aspect ratio
+            // Draw background color
+            context.clear(rect)
+            context.setFillColor(NSColor.windowBackgroundColor.cgColor)
+            context.fill(rect)
+
+            // Capture and draw desktop wallpaper
+            if let displayID = getDisplayID(for: display.index),
+               let desktopImage = captureDisplay(displayID: displayID, targetSize: targetSize) {
+                context.draw(desktopImage, in: rect)
+            }
+
+            // Draw windows
             let scale = targetSize.width / display.frame.width
-
-            var windowsDrawn = 0
-            var windowsCaptured = 0
-
-            // Filter windows for this display
             let displayWindows = windows.filter { $0.displayIndex == (display.index + 1) }
 
-            // Draw windows on top of desktop
             for window in displayWindows {
-                let scaledFrame = NSRect(
+                let scaledFrame = CGRect(
                     x: window.frame.origin.x * scale,
                     y: window.frame.origin.y * scale,
                     width: window.frame.size.width * scale,
                     height: window.frame.size.height * scale
                 )
 
-                // Pass actual window bounds (not scaled) to capture API
-                // Flip Y coordinate for CoreGraphics coordinate system
+                // Try to capture actual window content
                 let cgBounds = CGRect(
                     x: window.frame.origin.x,
                     y: display.frame.height - window.frame.origin.y - window.frame.height,
@@ -236,33 +272,22 @@ class PrivateWindowCapture {
                     height: window.frame.size.height
                 )
 
-                // Try to capture actual window content
                 if let cgImage = captureWindow(windowID: Int(window.id), bounds: cgBounds, size: scaledFrame.size) {
-                    let nsImage = NSImage(cgImage: cgImage, size: scaledFrame.size)
-                    nsImage.draw(in: scaledFrame)
-                    windowsDrawn += 1
-                    windowsCaptured += 1
+                    context.draw(cgImage, in: scaledFrame)
                 } else {
-                    // Fallback: draw clean white rectangle with black border (like windows mode)
-                    NSColor.white.setFill()
-                    NSBezierPath(rect: scaledFrame).fill()
-                    NSColor.black.setStroke()
-                    NSBezierPath(rect: scaledFrame).stroke()
-                    windowsDrawn += 1
+                    // Fallback: white rectangle with black border
+                    context.setFillColor(NSColor.white.cgColor)
+                    context.fill(scaledFrame)
+                    context.setStrokeColor(NSColor.black.cgColor)
+                    context.stroke(scaledFrame)
                 }
             }
 
-            image.unlockFocus()
+            if let finalCGImage = context.makeImage() {
+                return NSImage(cgImage: finalCGImage, size: targetSize)
+            }
 
-            // Add border
-            let bounded = NSImage(size: targetSize)
-            bounded.lockFocus()
-            NSColor.black.setStroke()
-            NSBezierPath(rect: NSRect(origin: .zero, size: targetSize)).stroke()
-            image.draw(in: NSRect(origin: .zero, size: targetSize))
-            bounded.unlockFocus()
-
-            return bounded
+            return nil
         }
     }
 }
