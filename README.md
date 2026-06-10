@@ -5,31 +5,22 @@
         <b>Clickable spaces switcher powered by Yabai</b>
     </p>
 
-    <img src="docs/simple.png" alt="screenshot">
-    <p>Numeric buttons for each workspace</p>
+    <img src="docs/floating-panel.png" alt="Floating Panel">
+    <p>Floating panel with keyboard navigation and window previews</p>
 
-    <img src="docs/window-mode.png" alt="screenshot">
-    <p>Window preview mode shows desktop layouts</p>
-
-    <img src="docs/screenshot-dark.png" alt="screenshot2">
-    <p>Multiple displays with separate spaces</p>
-
-    <img src="docs/fullscreen.png" alt="screenshot3">
-    <p>Fullscreen applications</p>
-
-    <img src="docs/compact.png" alt="screenshot4">
-    <p>Compact mode</p>
+    <img src="docs/settings.png" alt="Settings">
+    <p>Customizable panel layout and display options</p>
 </div>
 
 ## Features
 
-- **Three button styles**: Numeric, Window previews, or actual Thumbnails
-- **Floating panel**: Shows all spaces with keyboard navigation (←↑↓→ Enter, Escape)
+- **Floating panel**: Shows all spaces with window previews and keyboard navigation
+- **Keyboard navigation**: Arrow keys, Enter, and Escape for quick space switching
 - **Grid customization**: Configure columns (1-12) and rows (1-12) for the panel
 - **Real thumbnails**: Captures and caches actual screen thumbnails for spaces
-- **Hybrid previews**: Shows window outlines for unvisited spaces
 - **Multiple displays**: Separate spaces per display with optional divider
 - **Global hotkey**: `Option+Command+Space` toggles the floating panel
+- **Three-finger tap**: Right Shift tap shows the panel
 
 ## Requirements
 
@@ -37,9 +28,7 @@
 
 ## Installation
 
-### Download
-
-Download the latest universal binary (Intel + Apple Silicon) from [Releases](https://github.com/carcot/YabaiSpaces/releases).
+Download the latest release from [Releases](https://github.com/carcot/YabaiSpaces/releases).
 
 ### Yabai Signals
 
@@ -87,11 +76,12 @@ Access settings via:
 ## Panel Navigation
 
 When the panel is visible (`Option+Command+Space`):
-- **Arrow keys**: Navigate between spaces
+- **Arrow keys**: Navigate between spaces (with wrap-around)
 - **Enter/Space**: Switch to selected space
 - **Escape**: Close panel
 - **Click**: Switch to any space
 - **Right-click**: Open context menu
+- **Scroll/swipe**: Close panel
 
 ## Comparison to Similar Applications
 
