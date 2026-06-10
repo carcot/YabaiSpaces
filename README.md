@@ -1,15 +1,19 @@
 <div align="center">
-    <img src="docs/appicon.png" width="200" height="200">
-    <h1>YabaiSpaces</h1>
-    <p>
-        <b>Clickable spaces switcher powered by Yabai</b>
-    </p>
 
-    <img src="docs/floating-panel.png" alt="Floating Panel">
-    <p>Floating panel with keyboard navigation and window previews</p>
+<img src="docs/appicon.png" width="200" height="200">
 
-    <img src="docs/settings.png" alt="Settings">
-    <p>Customizable panel layout and display options</p>
+# YabaiSpaces
+
+**Clickable spaces switcher powered by Yabai**
+
+![Floating Panel](docs/floating-panel.png)
+
+Floating panel with keyboard navigation and window previews
+
+![Settings](docs/settings.png)
+
+Customizable panel layout and display options
+
 </div>
 
 ## Features
