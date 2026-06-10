@@ -8,7 +8,11 @@
 
 ![Floating Panel](docs/floating-panel.png)
 
-Floating panel with keyboard navigation and window previews
+Floating panel with window previews and keyboard navigation
+
+![Wireframe View](docs/floating-panel-wireframe.png)
+
+Wireframe window outlines for unvisited spaces
 
 ![Settings](docs/settings.png)
 
@@ -19,6 +23,7 @@ Customizable panel layout and display options
 ## Features
 
 - **Floating panel**: Shows all spaces with window previews and keyboard navigation
+- **Wireframe previews**: Shows window outlines for unvisited spaces
 - **Keyboard navigation**: Arrow keys, Enter, and Escape for quick space switching
 - **Grid customization**: Configure columns (1-12) and rows (1-12) for the panel
 - **Real thumbnails**: Captures and caches actual screen thumbnails for spaces
