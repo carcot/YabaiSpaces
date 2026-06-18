@@ -31,6 +31,10 @@ Customizable panel layout and display options
 - **Hotkeys**: `Cmd+Option+Ctrl+Shift+Space` or Right Shift tap toggles the floating panel
 - **BetterTouchTool**: Recommended - map three-finger tap to `Cmd+Option+Ctrl+Shift+Space` for panel access
 
+## Thumbnail Capture
+
+macOS has no public API for capturing screenshots of inactive spaces. YabaiSpaces captures thumbnails when you leave a space (via the panel), preserving that space's visual state. Unvisited spaces show wireframe window outlines until you switch to them.
+
 ## Requirements
 
 [Yabai](https://github.com/koekeishiya/yabai) is required for space switching and keeping spaces in sync. Version 4.0.2+ required. SIP must be disabled for space switching to work correctly.
