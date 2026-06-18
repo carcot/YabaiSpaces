@@ -84,7 +84,7 @@ Access settings via:
 
 ## Panel Navigation
 
-When the panel is visible (`Option+Command+Space`):
+When the panel is visible (`Cmd+Option+Ctrl+Shift+Space` or Right Shift tap):
 - **Arrow keys**: Navigate between spaces (with wrap-around)
 - **Enter/Space**: Switch to selected space
 - **Escape**: Close panel
