@@ -94,7 +94,7 @@ When the panel is visible (`Option+Command+Space`):
 
 ## Comparison to Similar Applications
 
-[YabaiIndicator](https://github.com/xiamaz/YabaiIndicator) by Max Zhao - Excellent app with reliable space detection via SkyLight framework and Yabai integration. Serves as the foundation for this project. Much thanks to Max for his great idea and for creating such a solid base for this project.
+[YabaiIndicator](https://github.com/xiamaz/YabaiIndicator) by Max Zhao - Excellent app with reliable space detection via SkyLight framework and Yabai integration. Serves as the foundation for this project. Huge thanks to Max for his great idea and for creating such a solid base for this project.
 
 [SpaceId](https://github.com/dshnkao/SpaceId) - More presentation configurability but no space switching. Doesn't use Yabai or Accessibility API.
 
