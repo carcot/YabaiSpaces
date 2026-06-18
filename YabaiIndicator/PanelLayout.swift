@@ -56,8 +56,8 @@ struct PanelLayout {
     var columnWidth: CGFloat { 32 * scale }
     var columnSpacing: CGFloat { 2 * scale }
     var buttonHeight: CGFloat { 20 * scale }
-    var rowSpacing: CGFloat { 4 * scale }
-    var padding: CGFloat { 4 * scale }
+    var rowSpacing: CGFloat { 3 * scale }
+    var padding: CGFloat { 3 * scale }
 
     // MARK: - Image Generation
     var baseImageHeight: CGFloat { 20 * scale }

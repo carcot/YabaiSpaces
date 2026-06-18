@@ -445,3 +445,31 @@ duplicate releases (belt-and-suspenders).
 - Cooldown prevents any rapid-fire duplicate handler calls
 - Re-registration works when gridPosition setting changes
 
+
+## 2026-06-18: Panel Spacing and Border Refinements
+
+### Changes
+- Reduced row spacing from `4 * scale` to `3 * scale` to better match visual balance
+- Reduced panel padding from `4 * scale` to `3 * scale` to match row spacing
+- Changed inactive thumbnail border from `Color.secondary` to `Color.white.opacity(0.2)` for brighter appearance
+- Fixed thumbnail capture timing: hide panel first, then capture, then switch (prevents panel from appearing in screenshots)
+
+### Files Modified
+- `PanelLayout.swift`: `rowSpacing = 3 * scale`, `padding = 3 * scale`
+- `ContentView.swift`: Inactive border color changed to `Color.white.opacity(0.2)`
+- `YabaiAppDelegate.swift`: Reordered `switchSpace()` to hide panel before capturing thumbnail
+
+### Attempted: External Switch Thumbnail Capture
+Attempted to capture thumbnails when switching spaces via keyboard/gestures (external to app). Multiple approaches tried:
+1. NSWorkspace.activeSpaceDidChangeNotification observer
+2. Track lastActiveSpaceId before model update
+3. Combine subscriber on spaceModel.$spaces
+
+All approaches failed because spaceModel is updated by Yabai signals before OS notification fires, making it impossible to reliably identify the old space after switch.
+
+Current behavior: Thumbnails only captured when switching via panel. External switches update UI but don't capture thumbnails.
+
+See `EXTERNAL_SWITCH_CAPTURE_NOTES.md` for detailed analysis and potential future approaches.
+
+### Files Created
+- `EXTERNAL_SWITCH_CAPTURE_NOTES.md`: Documents attempted approaches and root cause analysis

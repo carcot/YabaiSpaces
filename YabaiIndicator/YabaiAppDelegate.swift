@@ -84,7 +84,12 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     }
 
     // Track last active space for thumbnail capture
+    // (currently unused - reserved for future external switch capture implementation)
     private var lastActiveSpaceId: UInt64 = 0
+
+    // Flag to prevent double-capture when we initiate the switch ourselves
+    // (currently unused - reserved for future implementation)
+    private var didCaptureBeforeSwitch = false
 
     // Ensure hotkeys are only set up once (Combine publisher may fire during init)
     private var hasSetupHotkeys = false
@@ -119,12 +124,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     func onSpaceRefresh() {
         let displays = gNativeClient.queryDisplays()
         let spaceElems = gNativeClient.querySpaces()
-
-        // NOTE: Thumbnail capture is now only done in switchSpace() to avoid duplicates
-        // onSpaceRefresh() is called AFTER space switch, so we'd be capturing wrong state
-
-        // NOTE: Don't clear cache on every refresh - thumbnails should persist
-        // Only clear when spaces are actually reconfigured (not just switching)
 
         DispatchQueue.main.async {
             self.spaceModel.displays = displays
@@ -420,18 +419,11 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
         // Define bindings declaratively
         let bindings: [HotkeyBinding] = [
-            // Cmd+Option+Space - toggle panel (position based on gridPosition setting)
+            // Cmd+Option+Ctrl+Shift+Space - toggle panel
             HotkeyBinding(
                 id: 1,
                 keyCode: 49,  // Space
-                modifiers: UInt32(cmdKey | optionKey),
-                action: .toggle(panelPosition)
-            ),
-            // Cmd+Option+Ctrl+Space - toggle panel (redundant now, same as above)
-            HotkeyBinding(
-                id: 2,
-                keyCode: 49,  // Space
-                modifiers: UInt32(cmdKey | optionKey | controlKey),
+                modifiers: UInt32(cmdKey | optionKey | controlKey | shiftKey),
                 action: .toggle(panelPosition)
             ),
             // Right Shift - toggle panel on quick tap
@@ -449,7 +441,9 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         // Register all bindings
         for binding in bindings {
             if !HotkeyManager.shared.register(binding) {
-                // Failed to register hotkey
+                NSLog("[YabaiSpaces] Failed to register hotkey \(binding.id)")
+            } else {
+                NSLog("[YabaiSpaces] Registered hotkey \(binding.id) keyCode=\(binding.keyCode) trigger=\(binding.trigger)")
             }
         }
     }
@@ -624,29 +618,27 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
     // Switch spaces, optionally focusing a specific window
     func switchSpace(to yabaiIndex: Int, focusWindowId: UInt64? = nil) {
-        // Perform the space switch
-        gYabaiClient.focusSpace(index: yabaiIndex)
-
-        // Hide panel after switch (don't restore cursor - we're on a new desktop)
+        // Hide panel FIRST so screenshot doesn't include it
         panelManager?.cursorRestorationPolicy = .skip
         hidePanel()
 
-        // Capture thumbnail of the NEW space after switching (panel is now hidden)
-        // Small delay to ensure Yabai has completed the switch
+        // Capture thumbnail of CURRENT space BEFORE leaving
+        // This preserves the state of the space as it was when we leave it
+        if let currentSpace = spaceModel.spaces.first(where: { $0.active }) {
+            captureThumbnail(for: currentSpace)
+        }
+
+        // Perform the space switch
+        gYabaiClient.focusSpace(index: yabaiIndex)
+
+        // Update space model after switch
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             guard let self = self else { return }
 
             // Query spaces SYNCHRONOUSLY to get updated active flags
-            // (refreshData is async and won't complete in time)
             let spaceElems = gNativeClient.querySpaces()
             DispatchQueue.main.async {
                 self.spaceModel.spaces = spaceElems
-            }
-
-            // Find space by yabaiIndex - capture even if 'active' flag isn't set correctly
-            // (macOS sometimes misreports active status, especially for spaces with empty UUIDs)
-            if let newActive = spaceElems.first(where: { $0.yabaiIndex == yabaiIndex }) {
-                self.captureThumbnail(for: newActive)
             }
 
             // Focus specific window if requested

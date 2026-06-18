@@ -131,9 +131,11 @@ class ComposableHotkey {
             },
             userInfo: userData
         ) else {
+            NSLog("[YabaiSpaces] Failed to create CGEventTap for keyCode \(binding.keyCode)")
             return
         }
 
+        NSLog("[YabaiSpaces] Created CGEventTap for keyCode \(binding.keyCode)")
         eventTap = tap
         runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)

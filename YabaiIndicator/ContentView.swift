@@ -188,7 +188,7 @@ struct ThumbnailSpaceButton : View {
                         RoundedRectangle(cornerRadius: 0)
                             .inset(by: -thickness / 2)
                             .stroke(
-                                isAccent ? Color.accentColor : Color.secondary,
+                                isAccent ? Color.accentColor : Color.white.opacity(0.2),
                                 lineWidth: thickness
                             )
                     }
