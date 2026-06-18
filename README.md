@@ -29,7 +29,7 @@ Customizable panel layout and display options
 - **Real thumbnails**: Captures and caches actual screen thumbnails for spaces
 - **Multiple displays**: Separate spaces per display with optional divider
 - **Hotkeys**: `Cmd+Option+Ctrl+Shift+Space` or Right Shift tap toggles the floating panel
-- **BetterTouchTool**: Recommended - map three-finger tap to `Cmd+Option+Ctrl+Shift+Space` for panel access
+- **Note**: I recommend using BetterTouchTool to map three-finger tap to `Cmd+Option+Ctrl+Shift+Space` for easy panel access
 
 ## Thumbnail Capture
 
