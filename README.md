@@ -28,9 +28,8 @@ Customizable panel layout and display options
 - **Grid customization**: Configure columns (1-12) and rows (1-12) for the panel
 - **Real thumbnails**: Captures and caches actual screen thumbnails for spaces
 - **Multiple displays**: Separate spaces per display with optional divider
-- **Global hotkey**: `Cmd+Option+Ctrl+Shift+Space` toggles the floating panel
-- **Right Shift tap**: Quick tap on Right Shift key shows the panel
-- **BetterTouchTool**: Map three-finger tap to the hotkey for convenient panel access
+- **Hotkeys**: `Cmd+Option+Ctrl+Shift+Space` or Right Shift tap toggles the floating panel
+- **BetterTouchTool**: Recommended - map three-finger tap to `Cmd+Option+Ctrl+Shift+Space` for panel access
 
 ## Requirements
 
