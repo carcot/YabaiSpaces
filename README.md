@@ -27,7 +27,6 @@ Customizable panel layout and display options
 - **Keyboard navigation**: Arrow keys, Enter, and Escape for quick space switching
 - **Grid customization**: Configure columns (1-12) and rows (1-12) for the panel
 - **Real thumbnails**: Captures and caches actual screen thumbnails for spaces
-- **Multiple displays**: Separate spaces per display with optional divider
 - **Hotkeys**: `Cmd+Option+Ctrl+Shift+Space` or Right Shift tap toggles the floating panel
 - **Note**: I recommend using BetterTouchTool to map three-finger tap to `Cmd+Option+Ctrl+Shift+Space` for easy panel access
 
