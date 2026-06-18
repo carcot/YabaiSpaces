@@ -177,20 +177,16 @@ struct ThumbnailSpaceButton : View {
                 .overlay(
                     // Border styling: selection (navigation) + active state
                     // Border drawn outside the edge using negative inset
-                    ZStack {
-                        // Border: accent when active or selected, secondary gray otherwise
-                        // Thickness: 3px when active, 2px when selected inactive, 1px when inactive
-                        // (scaled by borderScale for thinner menubar borders)
-                        let isAccent = space.active || isSelected
-                        let baseThickness: CGFloat = space.active ? 3 : (isSelected ? 2 : 1)
-                        let thickness = baseThickness * borderScale
+                    Group {
+                        // Selected (where going): Blue, Active (where are): White
+                        // Blue takes precedence when both active + selected
+                        // Width: 3px for selected, 2px for active, 1px for inactive
+                        let thickness = (isSelected ? 3.0 : (space.active ? 2.0 : 1.0)) * borderScale
+                        let borderColor = borderColor(for: space, isSelected: isSelected)
 
                         RoundedRectangle(cornerRadius: 0)
                             .inset(by: -thickness / 2)
-                            .stroke(
-                                isAccent ? Color.accentColor : Color.white.opacity(0.2),
-                                lineWidth: thickness
-                            )
+                            .stroke(borderColor, lineWidth: thickness)
                     }
                 )
                 .onAppear {
@@ -248,6 +244,16 @@ struct ThumbnailSpaceButton : View {
             // No cached thumbnail - let the windows-style preview show in the body
             thumbnail = nil
             thumbnailSpaceId = 0
+        }
+    }
+
+    private func borderColor(for space: Space, isSelected: Bool) -> Color {
+        if isSelected {
+            return Color.accentColor  // Blue for selected (where going)
+        } else if space.active {
+            return Color.white.opacity(0.75)  // White for active (where are)
+        } else {
+            return Color.white.opacity(0.33)  // Subtle white for inactive
         }
     }
 }

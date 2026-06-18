@@ -618,18 +618,12 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
     // Switch spaces, optionally focusing a specific window
     func switchSpace(to yabaiIndex: Int, focusWindowId: UInt64? = nil) {
-        // Hide panel FIRST so screenshot doesn't include it
-        panelManager?.cursorRestorationPolicy = .skip
-        hidePanel()
-
-        // Capture thumbnail of CURRENT space BEFORE leaving
-        // This preserves the state of the space as it was when we leave it
-        if let currentSpace = spaceModel.spaces.first(where: { $0.active }) {
-            captureThumbnail(for: currentSpace)
-        }
-
         // Perform the space switch
         gYabaiClient.focusSpace(index: yabaiIndex)
+
+        // Hide panel after switch (don't restore cursor - we're on a new desktop)
+        panelManager?.cursorRestorationPolicy = .skip
+        hidePanel()
 
         // Update space model after switch
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in

@@ -54,7 +54,7 @@ class PanelManager: NSObject {
         hostingView.layer?.cornerRadius = 6
         hostingView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.8).cgColor
         hostingView.layer?.borderWidth = 2
-        hostingView.layer?.borderColor = NSColor.white.withAlphaComponent(0.3).cgColor
+        hostingView.layer?.borderColor = NSColor.white.withAlphaComponent(0.33).cgColor
         panel.contentView = hostingView
 
         self.panel = panel
@@ -107,6 +107,18 @@ class PanelManager: NSObject {
         }
 
         onPanelHide?()
+    }
+
+    // Move panel offscreen without hiding (for screenshot capture)
+    func moveOffscreen() {
+        guard let panel = panel else { return }
+        // Move panel far off-screen (negative coordinates)
+        panel.setFrameOrigin(NSPoint(x: -10000, y: -10000))
+    }
+
+    // Restore panel from offscreen position
+    func restoreFromOffscreen() {
+        // Panel will be repositioned on next show
     }
 
     // MARK: - Positioning
