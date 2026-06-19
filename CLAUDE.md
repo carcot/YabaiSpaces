@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-YabaiIndicator is a macOS menu bar app that displays clickable space/workspaces indicators. It integrates with [Yabai](https://github.com/koekeishiya/yabai) (a tiling window manager) for space switching and window management.
+YabaiSpaces is a macOS menu bar app that displays clickable space/workspaces indicators. It integrates with [Yabai](https://github.com/koekeishiya/yabai) (a tiling window manager) for space switching and window management.
+
+**Note**: The Xcode project and scheme are still named `YabaiIndicator`, but the app is branded as `YabaiSpaces` (bundle ID: `com.carcot.YabaiSpaces`).
 
 ## Build and Test Commands
 
