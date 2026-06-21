@@ -165,7 +165,7 @@ class PrivateWindowCapture {
             let pngData = cgImageToPNG(cgImage)
             cachedWallpaperData = pngData
             cachedWallpaperSize = targetSize
-            return cgImage
+            return cgImageFromPNG(pngData)  // Return fresh CGImage from PNG, not original
         }
 
         return nil
@@ -224,9 +224,9 @@ class PrivateWindowCapture {
         return nil
     }
 
-    /// Capture all windows for a space and composite them
-    func captureSpace(windows: [Window], display: Display, targetSize: CGSize) -> NSImage? {
-        captureQueue.sync {
+    /// Capture all windows for a space and composite them, returning PNG Data
+    func captureSpace(windows: [Window], display: Display, targetSize: CGSize) -> Data? {
+        return captureQueue.sync {
             let rect = CGRect(origin: .zero, size: targetSize)
 
             guard let context = CGContext(
@@ -284,7 +284,7 @@ class PrivateWindowCapture {
             }
 
             if let finalCGImage = context.makeImage() {
-                return NSImage(cgImage: finalCGImage, size: targetSize)
+                return cgImageToPNG(finalCGImage)
             }
 
             return nil

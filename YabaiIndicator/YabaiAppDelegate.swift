@@ -148,12 +148,12 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         let aspect = display.frame.width / display.frame.height
         let targetSize = CGSize(width: baseHeight * aspect, height: baseHeight)
 
-        if let thumbnail = gPrivateWindowCapture.captureSpace(
+        if let data = gPrivateWindowCapture.captureSpace(
             windows: spaceWindows,
             display: display,
             targetSize: targetSize
         ) {
-            gThumbnailCache.set(spaceId: space.spaceid, image: thumbnail)
+            gThumbnailCache.set(spaceId: space.spaceid, data: data)
         }
     }
 

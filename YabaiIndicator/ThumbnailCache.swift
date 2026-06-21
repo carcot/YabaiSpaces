@@ -14,7 +14,7 @@ extension Notification.Name {
 }
 
 class ThumbnailCache {
-    private var cache: [UInt64: NSImage] = [:]
+    private var cache: [UInt64: Data] = [:]
     private var accessOrder: [UInt64] = []
     private let maxCacheSize: Int
 
@@ -24,24 +24,35 @@ class ThumbnailCache {
 
     /// Get cached thumbnail for a space
     func get(spaceId: UInt64) -> NSImage? {
-        if let image = cache[spaceId] {
+        if let data = cache[spaceId] {
             // Move to end of access order (most recently used)
             accessOrder.removeAll { $0 == spaceId }
             accessOrder.append(spaceId)
-            return image
+            return NSImage(data: data)
         }
         return nil
     }
 
     /// Set thumbnail for a space, evicting oldest if necessary
     func set(spaceId: UInt64, image: NSImage) {
+        // Convert to PNG immediately to prevent CGImage leaks
+        guard let tiffData = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiffData),
+              let pngData = bitmap.representation(using: .png, properties: [:]) else {
+            return
+        }
+        set(spaceId: spaceId, data: pngData)
+    }
+
+    /// Set thumbnail PNG data directly (for captureSpace() which returns Data)
+    func set(spaceId: UInt64, data: Data) {
         // Remove existing entry if present
         if cache[spaceId] != nil {
             accessOrder.removeAll { $0 == spaceId }
         }
 
         // Add new entry
-        cache[spaceId] = image
+        cache[spaceId] = data
         accessOrder.append(spaceId)
 
         // Evict oldest entries if over limit
