@@ -313,19 +313,10 @@ func generateHybridPreviewImage(active: Bool, visible: Bool, windows: [Window], 
 
         let context = createCGContext(size: size)
 
-        // Draw cached wallpaper as background using NSImage (avoid CGImage dependencies)
-        if let nsImage = gPrivateWindowCapture.captureDesktop(display: display, targetSize: size) {
-            // Use NSGraphicsContext to draw without CoreGraphics dependencies
-            let nsContext = NSGraphicsContext(cgContext: context, flipped: false)
-            NSGraphicsContext.saveGraphicsState()
-            NSGraphicsContext.current = nsContext
-            nsImage.draw(in: rect)
-            NSGraphicsContext.restoreGraphicsState()
-        } else {
-            // Fallback: solid color
-            context.setFillColor(NSColor(red: 0.3, green: 0.35, blue: 0.45, alpha: 1.0).cgColor)
-            context.fill(rect)
-        }
+        // Use solid color background (wallpaper removed to prevent CGImage leaks)
+        // Window outlines provide sufficient visual feedback
+        context.setFillColor(NSColor(red: 0.3, green: 0.35, blue: 0.45, alpha: 1.0).cgColor)
+        context.fill(rect)
 
         // Draw window outlines
         drawWindowOutlines(context: context, windows: windows, display: display, targetSize: size)
