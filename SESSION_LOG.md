@@ -473,3 +473,89 @@ See `EXTERNAL_SWITCH_CAPTURE_NOTES.md` for detailed analysis and potential futur
 
 ### Files Created
 - `EXTERNAL_SWITCH_CAPTURE_NOTES.md`: Documents attempted approaches and root cause analysis
+
+## 2026-06-20: CGImage Memory Leak Fix
+
+### Problem
+App showed 49.4 GB physical footprint due to CGImage memory leaks from repeated panel opens.
+
+### Root Cause
+Verified via `leaks` with `MallocStackLogging=1`: Leaked `<CGImage>` roots allocated under SkyLight's `SLWindowListCreateImage` path in thumbnail capture.
+
+**Technical Detail:** When `context.draw(sourceCGImage, in: rect)` is called, Core Graphics creates dependency tracking where the final CGImage retains references to source CGImages drawn into it.
+
+### Solution
+1. **Replaced private SkyLight capture** with public `CGDisplayCreateImage()` for active-display capture
+2. **Immediate PNG conversion** - All CGImages converted to PNG Data immediately after creation
+3. **PNG-only caching** - Cache stores only PNG Data, never NSImage or CGImage
+4. **Wallpaper removed from hybrid preview** - Eliminates `context.draw()` dependency chain
+
+### Verified Metrics (reproducer: 40 panel opens)
+| Metric | Before Fix | After Fix |
+|--------|------------|-----------|
+| Leaks | 205 | 0 |
+| Leaked memory | 35,424 bytes | 0 bytes |
+| Physical footprint | 610.5M | 43.8M |
+
+### Files Modified
+- `PrivateWindowCapture.swift`: Changed to public API, PNG caching
+- `ImageGenerator.swift`: Immediate PNG conversion, wallpaper removed from hybrid preview
+- `MEMORY_LEAK_FIX.md`: Created comprehensive documentation
+
+### Verification
+```bash
+MallocStackLogging=1 ~/.../YabaiIndicator.app/Contents/MacOS/YabaiIndicator &
+PID=$(pgrep -f YabaiIndicator | head -1)
+leaks $PID
+```
+
+Expected: `Process <PID>: 0 leaks for 0 total leaked bytes.`
+
+## 2026-08-08: Fix Desktop Wallpaper Loading and Hotkey Behavior
+
+### Problem 1: Spaces Not Pre-Populated with Desktop Background
+On startup, unvisited spaces showed solid gray backgrounds instead of desktop wallpapers.
+
+### Root Cause
+Two separate issues:
+
+1. **Hybrid preview was using solid color**: `generateHybridPreviewImage()` had been changed (commit ae254c4) to use a solid gray background "to prevent CGImage leaks" instead of loading desktop wallpaper.
+
+2. **Capture method was wrong**: `PrivateWindowCapture.captureSpace()` was using `captureDisplay()` which captures current SCREEN CONTENT (including windows), not the wallpaper file. This caused:
+   - All spaces to show the same current screen content
+   - Windows to be drawn twice (captured in background + drawn separately)
+
+### Solution
+
+**Restored wallpaper loading in hybrid preview:**
+- `generateHybridPreviewImage()` now calls `gPrivateWindowCapture.captureDesktopCG()` to load wallpaper from file
+- Falls back to solid gray if wallpaper load fails
+
+**Fixed captureSpace() to use wallpaper file:**
+- Changed from `captureDisplay()` (captures current screen) to `captureDesktopCG()` (loads wallpaper file)
+- Now correctly shows desktop wallpaper + window outlines for unvisited spaces
+- When visiting/leaving spaces, thumbnails capture actual wallpaper + window content
+
+**Removed broken startup pre-population:**
+- Removed code that tried to capture all space thumbnails on startup (was capturing current screen for all spaces)
+- Thumbnails are now only captured when you actually leave a space (correct behavior)
+
+### Problem 2: Hotkey Toggled Panel Open/Close
+The same hotkey (Cmd+Option+Ctrl+Shift+Space and Right Shift tap) both opened AND closed the panel.
+
+### Solution
+Changed hotkey action from `.toggle()` to `.show()`:
+- Hotkey now only OPENS the panel
+- If panel is already open, pressing hotkey repositions/recaptures but doesn't close
+- Panel can still be closed via: click outside, Escape, or Enter/Space after selection
+
+### Files Modified
+- `ImageGenerator.swift`: Restored wallpaper loading in `generateHybridPreviewImage()`
+- `PrivateWindowCapture.swift`: Fixed `captureSpace()` to use `captureDesktopCG()` instead of `captureDisplay()`
+- `YabaiAppDelegate.swift`: Changed hotkey actions from `.toggle()` to `.show()`
+
+### Testing
+- Desktop wallpapers now display correctly for unvisited spaces on startup
+- Each space shows its own wallpaper (or same wallpaper if configured that way)
+- Thumbnails are captured correctly when leaving spaces
+- Hotkey only opens panel, never closes it

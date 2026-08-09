@@ -419,20 +419,20 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
         // Define bindings declaratively
         let bindings: [HotkeyBinding] = [
-            // Cmd+Option+Ctrl+Shift+Space - toggle panel
+            // Cmd+Option+Ctrl+Shift+Space - show panel (only opens, doesn't close)
             HotkeyBinding(
                 id: 1,
                 keyCode: 49,  // Space
                 modifiers: UInt32(cmdKey | optionKey | controlKey | shiftKey),
-                action: .toggle(panelPosition)
+                action: .show(panelPosition)
             ),
-            // Right Shift - toggle panel on quick tap
+            // Right Shift - show panel on quick tap
             // Uses tap trigger with 0.25s threshold to distinguish tap from hold
             HotkeyBinding(
                 id: 3,
                 keyCode: 60,  // Right Shift
                 modifiers: 0,
-                action: .toggle(panelPosition),
+                action: .show(panelPosition),
                 trigger: .tap(threshold: 0.25),
                 detectTyping: true
             ),
@@ -741,6 +741,9 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         }
 
         registerObservers()
+        
+        // Initial data fetch to populate spaces on startup
+        refreshData()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

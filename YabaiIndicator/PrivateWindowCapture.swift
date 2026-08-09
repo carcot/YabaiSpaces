@@ -246,9 +246,8 @@ class PrivateWindowCapture {
             context.setFillColor(NSColor.windowBackgroundColor.cgColor)
             context.fill(rect)
 
-            // Capture and draw desktop wallpaper
-            if let displayID = getDisplayID(for: display.index),
-               let desktopImage = captureDisplay(displayID: displayID, targetSize: targetSize) {
+            // Capture and draw desktop wallpaper (load from file, not current screen)
+            if let desktopImage = captureDesktopCG(display: display, targetSize: targetSize) {
                 context.draw(desktopImage, in: rect)
             }
 

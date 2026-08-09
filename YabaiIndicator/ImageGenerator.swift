@@ -313,10 +313,14 @@ func generateHybridPreviewImage(active: Bool, visible: Bool, windows: [Window], 
 
         let context = createCGContext(size: size)
 
-        // Use solid color background (wallpaper removed to prevent CGImage leaks)
-        // Window outlines provide sufficient visual feedback
-        context.setFillColor(NSColor(red: 0.3, green: 0.35, blue: 0.45, alpha: 1.0).cgColor)
-        context.fill(rect)
+        // Draw cached wallpaper as background
+        if let cgImage = gPrivateWindowCapture.captureDesktopCG(display: display, targetSize: size) {
+            context.draw(cgImage, in: rect)
+        } else {
+            // Fallback: solid color
+            context.setFillColor(NSColor(red: 0.3, green: 0.35, blue: 0.45, alpha: 1.0).cgColor)
+            context.fill(rect)
+        }
 
         // Draw window outlines
         drawWindowOutlines(context: context, windows: windows, display: display, targetSize: size)
