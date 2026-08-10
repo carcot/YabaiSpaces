@@ -1,5 +1,61 @@
 # Session Log
 
+## Future Work
+
+This section consolidates all incomplete work and potential future improvements from across the project.
+
+### High Priority
+
+**1. Wire Up showMenubar and showPanel Settings**
+- Settings window has `showMenubar` and `showPanel` toggles that don't function yet
+- Need to implement:
+  - Hide/show menubar status item based on `showMenubar` setting
+  - Enable/disable panel hotkeys based on `showPanel` setting
+- Added: 2025-03-15 (Settings window redesign)
+
+**2. External Switch Thumbnail Capture**
+- Currently thumbnails only captured when switching via panel
+- External switches (keyboard shortcuts, trackpad gestures, Yabai commands) update UI but don't capture thumbnails
+- Multiple approaches attempted and documented in `EXTERNAL_SWITCH_CAPTURE_NOTES.md`
+- Root cause: Yabai signals update spaceModel before OS notifications fire, making it impossible to identify the old space after switch
+- 5 potential approaches documented for future implementation
+- Added: 2026-06-18 (Panel spacing and border refinements)
+
+### Medium Priority
+
+**3. Thumbnail Pre-Capture Configurability**
+- Make pre-capture configurable via preferences
+- Options:
+  - "Instant panel" (no pre-capture, uses cached thumbnails) - ~0ms latency
+  - "Fresh thumbnails" (pre-capture before showing panel) - ~140ms latency
+- Currently pre-capture always happens
+- Added: 2025-03-15 (Thumbnail pre-capture on panel show)
+
+**4. Custom Hotkey Support**
+- Currently fixed to `Cmd+Option+Ctrl+Shift+Space` or Right Shift tap
+- User-configurable hotkeys would allow personal preference and conflict avoidance
+- Added: README.md Future Work section
+
+**5. Visual Grid Configuration**
+- Current settings panel uses numeric inputs for grid dimensions
+- Visual preview with drag-to-resize grid cells would make layout customization more intuitive
+- Added: README.md Future Work section
+
+### Low Priority
+
+**6. Full-Screen App Handling**
+- Full-screen apps currently occupy an entire space but aren't visually distinguished
+- Need UI approach to indicate full-screen spaces
+- Added: README.md Future Work section
+
+**7. Multi-Monitor Refinements**
+- Spaces currently show across displays
+- Per-display grid layouts or display-specific panels could improve multi-monitor workflows
+- Blocking: No way to test multiple displays (developer limitation)
+- Added: README.md Future Work section
+
+---
+
 ## 2026-08-10: Add Socket Timeouts and Error Isolation to Prevent Hangs
 
 ### Problem
@@ -473,12 +529,6 @@ of always-fresh thumbnails.
   - Added pre-capture in `showPanelCentered()`
   - Removed debug logging code
 
-### Future Work
-Make pre-capture configurable via preferences:
-- "Instant panel" (no pre-capture, uses cached thumbnails)
-- "Fresh thumbnails" (pre-capture, ~140ms latency)
-
-
 ## 2025-03-15: Cursor Centering and Restoration on Panel Show/Hide
 
 ### Changes
@@ -567,11 +617,6 @@ Redesigned settings as a single panel with:
   - Removed hardcoded window dimensions
 - `YabaiIndicator/defaults.plist`:
   - Added `showMenubar = true` and `showPanel = true` defaults
-
-### Future Work
-Wire up `showMenubar` and `showPanel` to actually:
-- Hide/show menubar status item
-- Enable/disable panel hotkeys
 
 ## 2025-03-15: Fix Right Shift Double-Tap Issue
 
