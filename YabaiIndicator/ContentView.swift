@@ -218,7 +218,9 @@ struct ThumbnailSpaceButton : View {
                         }
                 )
             } else {
-                Image(nsImage: generateImage(active: space.active, visible: space.visible, windows: windows, display: displays[0], scale: layout.scale))
+                // Fallback: use first available display or minimal frame for numeric style
+                let fallbackDisplay = displays.first ?? Display(id: 0, uuid: "", index: 0, frame: NSRect(x: 0, y: 0, width: 1920, height: 1080))
+                Image(nsImage: generateImage(active: space.active, visible: space.visible, windows: windows, display: fallbackDisplay, scale: layout.scale))
                     .onTapGesture { switchSpace() }
                     .frame(width: layout.imageSize.width, height: layout.imageSize.height)
             }

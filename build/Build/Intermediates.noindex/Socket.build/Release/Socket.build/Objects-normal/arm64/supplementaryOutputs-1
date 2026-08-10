@@ -1,0 +1,12 @@
+{
+  "/Users/carlcotner/dev/YabaiIndicator/build/SourcePackages/checkouts/BlueSocket/Sources/Socket/Socket+Equatable.swift" : {
+    "abi-baseline-json" : "/Users/carlcotner/dev/YabaiIndicator/build/Build/Intermediates.noindex/Socket.build/Release/Socket.build/Objects-normal/arm64/Socket.abi.json",
+    "const-values" : "/Users/carlcotner/dev/YabaiIndicator/build/Build/Intermediates.noindex/Socket.build/Release/Socket.build/Objects-normal/arm64/Socket-primary.swiftconstvalues",
+    "dependencies" : "/Users/carlcotner/dev/YabaiIndicator/build/Build/Intermediates.noindex/Socket.build/Release/Socket.build/Objects-normal/arm64/Socket-primary.d",
+    "diagnostics" : "/Users/carlcotner/dev/YabaiIndicator/build/Build/Intermediates.noindex/Socket.build/Release/Socket.build/Objects-normal/arm64/Socket-primary.dia",
+    "objc-header" : "/Users/carlcotner/dev/YabaiIndicator/build/Build/Intermediates.noindex/Socket.build/Release/Socket.build/Objects-normal/arm64/Socket-Swift.h",
+    "swiftdoc" : "/Users/carlcotner/dev/YabaiIndicator/build/Build/Intermediates.noindex/Socket.build/Release/Socket.build/Objects-normal/arm64/Socket.swiftdoc",
+    "swiftmodule" : "/Users/carlcotner/dev/YabaiIndicator/build/Build/Intermediates.noindex/Socket.build/Release/Socket.build/Objects-normal/arm64/Socket.swiftmodule",
+    "swiftsourceinfo" : "/Users/carlcotner/dev/YabaiIndicator/build/Build/Intermediates.noindex/Socket.build/Release/Socket.build/Objects-normal/arm64/Socket.swiftsourceinfo"
+  }
+}
