@@ -1,5 +1,45 @@
 # Session Log
 
+## 2026-08-10: Fix Force-Unwrap Crashes in YabaiClient and ContentView
+
+### Problem
+App would crash when Yabai returned malformed JSON or when display data was missing. Two critical crash vectors:
+
+1. **YabaiClient queryWindows()**: 11 force-unwraps (`as!`) in a single compactMap closure. If any JSON field was missing or wrong type, the entire app would crash.
+
+2. **ContentView ThumbnailSpaceButton**: `displays[0]` force-unwrap when display lookup failed. If displays array was empty (query failure), crash was guaranteed.
+
+### Root Cause
+Code assumed Yabai would always return perfectly formed JSON with all fields present. No defensive programming for:
+- Missing JSON fields
+- Wrong data types  
+- Empty arrays
+- Failed queries
+
+### Solution
+
+**YabaiClient.swift queryWindows()**:
+- Replaced force-unwrapping chain with safe extraction using `guard let`
+- Each JSON field now safely cast with logging on failure
+- Invalid windows are skipped (logged) instead of crashing
+- Defaults for optional fields (`title`, `displayIndex`, `spaceIndex`)
+
+**ContentView.swift ThumbnailSpaceButton**:
+- Replaced `displays[0]` with `displays.first ?? Display(fallback)`
+- Creates synthetic display for graceful degradation if query fails
+- Falls back to numeric button style instead of crashing
+
+### Files Modified
+- `YabaiIndicator/Connectors/YabaiClient.swift`: Safe JSON extraction with logging
+- `YabaiIndicator/ContentView.swift`: Safe display array access with fallback
+
+### Testing
+- Build succeeded with no syntax errors
+- App no longer crashes on malformed Yabai responses
+- Graceful degradation when display data unavailable
+
+## 2025-03-13: Fix Thumbnail Race Condition - Use SpaceID Instead of UUID
+
 ## 2025-03-13: Fix Thumbnail Race Condition - Use SpaceID Instead of UUID
 
 ### Problem

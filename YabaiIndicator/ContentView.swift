@@ -31,7 +31,12 @@ struct SpaceButton : View {
     
     func switchSpace() {
         if !space.active && space.yabaiIndex > 0 {
-            gYabaiClient.focusSpace(index: space.yabaiIndex)
+            do {
+                try gYabaiClient.focusSpace(index: space.yabaiIndex)
+            } catch {
+                NSLog("[YabaiSpaces] Failed to switch to space \(space.yabaiIndex): \(error.localizedDescription)")
+                // Silent failure in UI context - user can try again
+            }
         }        
     }
     
@@ -54,7 +59,12 @@ struct WindowSpaceButton : View {
 
     func switchSpace() {
         if !space.active && space.yabaiIndex > 0 {
-            gYabaiClient.focusSpace(index: space.yabaiIndex)
+            do {
+                try gYabaiClient.focusSpace(index: space.yabaiIndex)
+            } catch {
+                NSLog("[YabaiSpaces] Failed to switch to space \(space.yabaiIndex): \(error.localizedDescription)")
+                // Silent failure in UI context - user can try again
+            }
         }
     }
 

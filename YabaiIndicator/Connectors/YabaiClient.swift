@@ -12,6 +12,43 @@ struct YabaiResponse {
     let response:Any
 }
 
+
+// MARK: - Error Types
+
+enum YabaiError: Error, LocalizedError {
+    case connectionFailed(String)
+    case invalidResponse(String)
+    case yabaiNotRunning
+    case jsonParseError(String)
+    case queryFailed(String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .connectionFailed(let message):
+            return "Cannot connect to Yabai: \(message)"
+        case .invalidResponse(let message):
+            return "Invalid response from Yabai: \(message)"
+        case .yabaiNotRunning:
+            return "Yabai is not running. Start Yabai to enable window management features."
+        case .jsonParseError(let message):
+            return "Failed to parse Yabai response: \(message)"
+        case .queryFailed(let message):
+            return "Query failed: \(message)"
+        }
+    }
+    
+    var recoverySuggestion: String? {
+        switch self {
+        case .connectionFailed, .yabaiNotRunning:
+            return "Start Yabai with: yabai --start-service"
+        case .invalidResponse, .jsonParseError:
+            return "Check Yabai version compatibility"
+        case .queryFailed:
+            return "Retry the operation or check Yabai logs"
+        }
+    }
+}
+
 class YabaiClient {
     
     func _yabaiSocketCall(_ args: [String]) -> (Int, String) {
@@ -26,19 +63,37 @@ class YabaiClient {
             response = String(cString: r)
         }
         free(cresp)
+        
+        // Detect specific Yabai connection errors
+        if response.contains("failed to connect to socket") {
+            NSLog("[YabaiSpaces] Yabai socket not found - Yabai may not be running")
+        } else if response.contains("failed to open socket") {
+            NSLog("[YabaiSpaces] Cannot open Yabai socket - check permissions")
+        }
+        
         return (Int(ret), response)
     }
     
     @discardableResult
-    func yabaiSocketCall(_ args: String...) -> YabaiResponse {
+    func yabaiSocketCall(_ args: String...) throws -> YabaiResponse {
         let (e, m) = _yabaiSocketCall(args)
         var resp: Any = []
+        
+        // Check for connection errors
+        if e != EXIT_SUCCESS {
+            if m.contains("failed to connect") || m.contains("failed to open socket") {
+                throw YabaiError.yabaiNotRunning
+            }
+            throw YabaiError.connectionFailed(m)
+        }
+        
         if m.count > 0 {
             if let data = m.data(using: .utf8) {
                 do {
                     resp = try JSONSerialization.jsonObject(with: data, options: [])
                 } catch {
-                    // JSON parsing error
+                    NSLog("[YabaiSpaces] JSON parse error: \(error.localizedDescription)")
+                    throw YabaiError.jsonParseError("JSON parsing failed: \(error.localizedDescription)")
                 }
             }
         }
@@ -46,18 +101,25 @@ class YabaiClient {
         return r
     }
     
-    func focusSpace(index: Int) {
-        yabaiSocketCall(
+    func focusSpace(index: Int) throws {
+        try yabaiSocketCall(
             "-m", "space", "--focus", "\(index)")
     }
 
-    func focusWindow(id: UInt64) {
-        yabaiSocketCall(
+    func focusWindow(id: UInt64) throws {
+        try yabaiSocketCall(
             "-m", "window", "--focus", "\(id)")
     }
 
-    func queryWindows() -> [Window] {
-        if let r = yabaiSocketCall("-m", "query", "--windows").response as? [[String: Any]] {
+    func queryWindows() throws -> [Window] {
+        do {
+            let response = try yabaiSocketCall("-m", "query", "--windows")
+            
+            guard let r = response.response as? [[String: Any]] else {
+                NSLog("[YabaiSpaces] Invalid response format - expected array of dictionaries")
+                throw YabaiError.invalidResponse("Expected array of window dictionaries")
+            }
+            
             let windows = r.compactMap { (dict: [String: Any]) -> Window? in
                 // Safe extraction with nil coalescing and logging
                 guard let id = dict["id"] as? UInt64 else {
@@ -98,10 +160,18 @@ class YabaiClient {
                     spaceIndex: spaceIndex
                 )
             }
+            
+            if windows.isEmpty && r.count > 0 {
+                NSLog("[YabaiSpaces] All windows filtered out due to invalid data")
+            }
+            
             return windows
+        } catch let error as YabaiError {
+            throw error
+        } catch {
+            NSLog("[YabaiSpaces] Unexpected error in queryWindows: \(error.localizedDescription)")
+            throw YabaiError.queryFailed(error.localizedDescription)
         }
-        NSLog("[YabaiSpaces] Failed to get windows from Yabai or invalid response format")
-        return []
     }
 }
 
