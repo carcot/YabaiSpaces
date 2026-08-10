@@ -60,7 +60,7 @@ int send_message(int argc, char** argv, char** response) {
     }
 
     char *message = malloc(sizeof(int)+message_length);
-    char *temp = sizeof(int)+message;
+    char *temp = message + sizeof(int);
     
     memcpy(message, &message_length, sizeof(int));
     
@@ -71,10 +71,30 @@ int send_message(int argc, char** argv, char** response) {
     }
     *temp++ = '\0';
     
+    // Set socket timeouts
+    struct timeval timeout;
+    timeout.tv_sec = 2;
+    timeout.tv_usec = 0;
+    
     int sockfd;
     sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sockfd == -1) {
         snprintf(*response, BUFSIZ, "yabai-msg: failed to open socket..\n");
+        return EXIT_FAILURE;
+    }
+    
+    // Set receive timeout
+    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) == -1) {
+        snprintf(*response, BUFSIZ, "yabai-msg: failed to set socket timeout..\n");
+        socket_close(sockfd);
+        return EXIT_FAILURE;
+    }
+    
+    // Set send timeout  
+    timeout.tv_sec = 5;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) == -1) {
+        snprintf(*response, BUFSIZ, "yabai-msg: failed to set send timeout..\n");
+        socket_close(sockfd);
         return EXIT_FAILURE;
     }
 

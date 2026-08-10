@@ -10,6 +10,7 @@ import Socket
 import Combine
 import Carbon
 import ApplicationServices
+import Foundation
 
 // Custom panel that can become key window even with nonactivating style
 class KeyPanel: NSPanel {
@@ -509,25 +510,42 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         do {
             let socket = try Socket.create(family: .unix, type: .stream, proto: .unix)
             try socket.listen(on: "/tmp/yabai-indicator.socket")
+            
             while true {
-                let conn = try socket.acceptClientConnection()
-                let msg = try conn.readString()?.trimmingCharacters(in: .whitespacesAndNewlines)
-                conn.close()
-                // log("Received message: \(msg!).")
-                if msg == "refresh" {
-                    self.refreshData()
-                } else if msg == "refresh spaces" {
-                    Task { @MainActor in
-                        self.onSpaceRefresh()
+                do {
+                    let conn = try socket.acceptClientConnection()
+                    
+                    // Set socket timeouts using POSIX options
+                    var timeout = timeval(tv_sec: 2, tv_usec: 0)
+                    let sockfd = conn.socketfd
+                    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout)))
+                    
+                    let msg = try conn.readString()?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    conn.close()
+                    
+                    if msg == "refresh" {
+                        self.refreshData()
+                    } else if msg == "refresh spaces" {
+                        Task { @MainActor in
+                            self.onSpaceRefresh()
+                        }
+                    } else if msg == "refresh windows" {
+                        Task { @MainActor in
+                            self.onWindowRefresh()
+                        }
                     }
-                } else if msg == "refresh windows" {
-                    Task { @MainActor in
-                        self.onWindowRefresh()
-                    }
+                } catch let error where error is Socket.Error {
+                    // Socket error - log and continue
+                    NSLog("[YabaiSpaces] Socket operation failed: \(error.localizedDescription)")
+                    continue
+                } catch {
+                    // Other errors
+                    NSLog("[YabaiSpaces] Unexpected error in socket server: \(error.localizedDescription)")
+                    continue
                 }
             }
         } catch {
-            // Socket server error
+            NSLog("[YabaiSpaces] Socket server error: \(error.localizedDescription)")
         }
     }
     
