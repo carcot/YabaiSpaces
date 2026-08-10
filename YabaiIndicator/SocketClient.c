@@ -83,11 +83,13 @@ int send_message(int argc, char** argv, char** response) {
     
     if (!socket_connect(&sockfd, socket_file)) {
         snprintf(*response, BUFSIZ, "yabai-msg: failed to connect to socket..\n");
+        socket_close(sockfd);
         return EXIT_FAILURE;
     }
     
     if (send(sockfd, message, sizeof(int)+message_length, 0) == -1) {
         snprintf(*response, BUFSIZ, "yabai-msg: failed to send data..\n");
+        socket_close(sockfd);
         return EXIT_FAILURE;
     }
     

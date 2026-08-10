@@ -1,5 +1,98 @@
 # Session Log
 
+## 2026-08-10: Fix SocketClient.c Memory Leaks
+
+### Problem
+Socket file descriptors leaked on every error path in send_message(). Each failed connection, send operation, or socket creation left a file descriptor open, accumulating over time.
+
+### Root Cause
+Early return paths in error handling didn't close the socket before returning:
+```c
+if (sockfd == -1) {
+    return EXIT_FAILURE;  // sockfd not closed (though -1, so acceptable)
+}
+if (!socket_connect(&sockfd, socket_file)) {
+    return EXIT_FAILURE;  // sockfd leaked!
+}
+```
+
+Additionally, Swift cleanup code wasn't using RAII/defer pattern, risking resource leaks if exceptions occurred.
+
+### Solution
+
+**SocketClient.c:**
+- Added `socket_close(sockfd)` before all early returns after socket creation
+- Ensures all file descriptors are properly closed before returning error
+
+**YabaiClient.swift:**
+- Replaced manual free() calls with defer{} block for guaranteed cleanup
+- Ensures strdup'd strings and response buffer are always freed, even on early returns
+
+### Files Modified
+- `YabaiIndicator/SocketClient.c`: Added socket_close() on error paths  
+- `YabaiIndicator/Connectors/YabaiClient.swift`: Added defer{} cleanup pattern
+- `SESSION_LOG.md`: Documentation
+
+### Testing
+- Build succeeded
+- No more file descriptor leaks on Yabai connection failures
+- Guaranteed cleanup of C memory allocations
+
+## 2026-08-10: Add Comprehensive Error Handling with User Visibility
+
+### Problem
+App failed silently when Yabai was unavailable or API calls failed. Users had zero feedback about:
+- Yabai not running
+- Socket connection failures  
+- Invalid JSON responses
+- SkyLight API failures
+
+### Root Cause
+All methods returned empty/default values on failure instead of propagating errors. No structured logging or user-facing error messages.
+
+### Solution
+
+**Added Error Types:**
+```swift
+enum YabaiError: Error, LocalizedError {
+    case connectionFailed(String)
+    case invalidResponse(String) 
+    case yabaiNotRunning
+    case jsonParseError(String)
+    case queryFailed(String)
+}
+```
+
+**Updated Methods to Throw:**
+- `YabaiClient.queryWindows() throws -> [Window]`
+- `YabaiClient.focusSpace(index:) throws`
+- `YabaiClient.focusWindow(id:) throws`
+- All methods now throw instead of returning empty values
+
+**Error Handling at Call Sites:**
+- `YabaiAppDelegate.onWindowRefresh()`: Catches errors, clears stale data
+- `YabaiAppDelegate.switchSpace()`: Shows user alert on failure
+- `YabaiAppDelegate.captureThumbnail()`: Logs errors, continues without thumbnail
+- UI button handlers: Silent failures with logging
+
+**User-Facing Features:**
+- NSAlert dialogs for critical errors (Yabai not running, connection failures)
+- Localized error descriptions with recovery suggestions
+- Structured logging to Console.app for debugging
+- Graceful degradation (app keeps running with reduced functionality)
+
+### Files Modified
+- `YabaiIndicator/Connectors/YabaiClient.swift`: Added YabaiError enum, made methods throw
+- `YabaiIndicator/Connectors/NativeClient.swift`: Added NativeError enum, error logging
+- `YabaiIndicator/YabaiAppDelegate.swift`: Added showErrorAlert(), error handling at call sites
+- `YabaiIndicator/ContentView.swift`: Error handling in button click handlers
+
+### Testing
+- Build succeeded with no errors
+- User now sees alert when Yabai isn't running
+- Errors logged to Console.app for debugging
+- App continues running with reduced functionality when Yabai unavailable
+
 ## 2026-08-10: Fix Force-Unwrap Crashes in YabaiClient and ContentView
 
 ### Problem

@@ -54,21 +54,18 @@ class YabaiClient {
     func _yabaiSocketCall(_ args: [String]) -> (Int, String) {
         var cresp:UnsafeMutablePointer<CChar>? = nil
         var cargs = args.map { strdup($0) }
+        
+        // Ensure cleanup happens even if errors occur
+        defer {
+            for ptr in cargs { free(ptr) }
+            if let resp = cresp { free(resp) }
+        }
 
         let ret = send_message(Int32(args.count), &cargs, &cresp)
-
-        for ptr in cargs { free(ptr) }
+        
         var response = ""
         if let r = cresp {
             response = String(cString: r)
-        }
-        free(cresp)
-        
-        // Detect specific Yabai connection errors
-        if response.contains("failed to connect to socket") {
-            NSLog("[YabaiSpaces] Yabai socket not found - Yabai may not be running")
-        } else if response.contains("failed to open socket") {
-            NSLog("[YabaiSpaces] Cannot open Yabai socket - check permissions")
         }
         
         return (Int(ret), response)
