@@ -1,5 +1,50 @@
 # Session Log
 
+## 2026-08-10: Add Socket Timeouts and Error Isolation to Prevent Hangs
+
+### Problem
+Socket communication could hang indefinitely when:
+- Yabai socket server was unresponsive or slow
+- Network timeouts were not configured
+- Server socket operations blocked indefinitely
+
+This caused the app to freeze waiting for socket responses, with no user feedback.
+
+### Root Cause
+Two issues:
+
+1. **Pointer arithmetic bug in SocketClient.c**: Line 63 had `char *temp = sizeof(int)+message;` which added the SIZE value to the pointer, not the offset. Should be `message + sizeof(int)`.
+
+2. **No socket timeouts**: Neither client nor server sockets configured `SO_RCVTIMEO` or `SO_SNDTIMEO` options, causing indefinite blocking on `read()` or `send()` operations.
+
+3. **No error isolation**: Server socket loop didn't isolate errors - a single failed connection could bring down the entire socket server.
+
+### Solution
+
+**SocketClient.c:**
+- Fixed pointer arithmetic: `char *temp = message + sizeof(int);`
+- Added 2-second receive timeout using `setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, ...)`
+- Added 5-second send timeout using `setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, ...)`
+- Added error checking for `setsockopt` failures with socket cleanup
+
+**YabaiAppDelegate.swift:**
+- Added 2-second receive timeout on server socket using POSIX `setsockopt()`
+- Wrapped socket operations in do-catch blocks for error isolation
+- Added NSLog error logging: `[YabaiSpaces] Socket operation failed: ...`
+- Server now continues serving on socket errors instead of crashing
+- Fixed type conversion: `socklen_t(MemoryLayout.size(ofValue: timeout))`
+
+### Files Modified
+- `YabaiIndicator/SocketClient.c`: Fixed pointer bug, added client-side timeouts
+- `YabaiIndicator/YabaiAppDelegate.swift`: Added server-side timeouts, error isolation, logging
+- `SESSION_LOG.md`: Documentation
+
+### Testing
+- Debug build succeeded
+- App launched successfully
+- Socket operations now timeout after 2-5 seconds instead of hanging indefinitely
+- Server errors are logged and don't crash the app
+
 ## 2026-08-10: Fix SocketClient.c Memory Leaks
 
 ### Problem
