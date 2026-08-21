@@ -1,6 +1,73 @@
 # Session Log
 
-## 2026-08-21: Desktop Wallpaper Loading Fix
+## 2026-08-21: FAILED - Desktop Wallpaper Restoration Caused Memory Leak Regression
+
+### Outcome
+🚨 **FAILED** - Wallpaper restoration reintroduced CGImage memory leaks that were fixed in commit `ae254c4`
+
+### What We Tried
+Attempted to restore desktop wallpapers to hybrid previews using "memory-safe" direct CGImage drawing:
+```swift
+// Our approach - assumed to be safe
+context.draw(wallpaperCG, in: rect)  // Still leaks CGImage
+```
+
+### What Actually Happened
+- **Memory pattern**: 75 MB → 126 MB over panel opens (51 MB leak)
+- **Leaks tool**: 84 CGImage leaks for 14,544 bytes
+- **Root cause**: Direct CGImage drawing still creates dependency leaks
+
+### Why It Failed
+Both approaches leak memory:
+```swift
+// Original approach - leaks
+let wallpaper = NSImage(cgImage: wallpaperCG, size: size)
+wallpaper.draw(in: rect)  // CGImage leaks
+
+// Our "fix" - still leaks  
+context.draw(wallpaperCG, in: rect)  // CGImage leaks
+```
+
+**Fundamental issue**: Any CGImage drawing in this context creates dependency leaks, regardless of drawing method.
+
+### Files Modified (BROKEN)
+- `YabaiIndicator/PrivateWindowCapture.swift` - Multi-screen wallpaper loading
+- `YabaiIndicator/ImageGenerator.swift` - Direct CGImage drawing (LEAKING)
+- `YabaiIndicator/ButtonImageCache.swift` - Separate wallpaper cache
+- `YabaiIndicator/Connectors/YabaiClient.swift` - Fixed queryWindows logic
+- `WALLPAPER_LOADING_FIX.md` - Incorrect documentation (claimed memory-safe)
+- `SESSION_LOG.md` - This file
+
+### Commits That Need Reversion
+- `4940905` "fix: restore desktop wallpapers in hybrid previews (memory-safe)" - REVERT THIS
+- `0de1e29` "fix: add safety checks and improvements" - Keep (memory logging works)
+
+### What Commit ae254c4 Actually Did
+The original fix removed wallpapers entirely because **all wallpaper rendering approaches leak**:
+```swift
+// The working solution from ae254c4
+context.setFillColor(NSColor(red: 0.3, green: 0.35, blue: 0.45, alpha: 1.0).cgColor)
+context.fill(rect)  // Gray background, no leaks
+```
+
+### Next Steps
+1. **Revert commit `4940905`** to restore memory-safe behavior
+2. **Keep gray backgrounds** until a truly leak-free wallpaper approach is found
+3. **Investigate alternatives**: Pre-rendered PNG wallpapers, different rendering pipeline, etc.
+
+### Lessons Learned
+- Don't assume "direct" drawing is safer than NSImage drawing
+- Test with `leaks` tool during development, not just basic functionality
+- The original fix removed wallpapers for a reason - should have understood why first
+- Memory logging works perfectly and caught the leak immediately
+
+### Evidence
+- Memory log shows 51 MB increase: 75 MB → 126 MB
+- Leaks tool confirms 84 CGImage leaks
+- Pattern confirms leak occurs with each panel open
+
+## 2026-08-21: Desktop Wallpaper Loading Fix (FAILED - ABOVE)
+
 
 ### Problem
 Desktop wallpaper loading had been removed in commit `ae254c4` to fix CGImage memory leaks, resulting in gray/black backgrounds instead of actual desktop wallpapers in hybrid preview mode.
