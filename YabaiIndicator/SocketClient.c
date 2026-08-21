@@ -60,7 +60,7 @@ int send_message(int argc, char** argv, char** response) {
     }
 
     char *message = malloc(sizeof(int)+message_length);
-    char *temp = sizeof(int)+message;
+    char *temp = message + sizeof(int);
     
     memcpy(message, &message_length, sizeof(int));
     
@@ -78,16 +78,28 @@ int send_message(int argc, char** argv, char** response) {
         return EXIT_FAILURE;
     }
 
+    // Set socket timeouts to prevent hangs
+    struct timeval timeout;
+    timeout.tv_sec = 2;
+    timeout.tv_usec = 0;
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+    timeout.tv_sec = 5;
+    timeout.tv_usec = 0;
+    setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+
     char socket_file[MAXLEN];
     snprintf(socket_file, sizeof(socket_file), SOCKET_PATH_FMT, user);
     
     if (!socket_connect(&sockfd, socket_file)) {
         snprintf(*response, BUFSIZ, "yabai-msg: failed to connect to socket..\n");
+        socket_close(sockfd);
         return EXIT_FAILURE;
     }
     
     if (send(sockfd, message, sizeof(int)+message_length, 0) == -1) {
         snprintf(*response, BUFSIZ, "yabai-msg: failed to send data..\n");
+        socket_close(sockfd);
         return EXIT_FAILURE;
     }
     

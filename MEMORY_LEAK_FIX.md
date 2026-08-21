@@ -1,313 +1,122 @@
 # Memory Leak Fix Documentation
 
-## Original Problem
+## Current Summary
 
-YabaiIndicator had a severe memory leak with CGImage accumulation:
-- **1911 CGImage leaks** (311KB total leaked memory)
-- **7.0G physical footprint** after 8 hours of runtime
-- Leaks caused app to consume all available RAM and eventually become unresponsive
+The verified memory leak was in active-space thumbnail capture, not in wallpaper-backed hybrid previews.
 
-## Root Cause Analysis
+The leaking path used private SkyLight capture APIs:
 
-After extensive investigation using `leaks` command and code analysis, the root cause was identified:
-
-### Primary Issue: Duplicate CGImage Creation Pattern
-
-The original code had a bug where CGImages were created but never used:
-
-```swift
-// BUG: This pattern created duplicate CGImages
-cgImage = context.makeImage()  // Creates CGImage #1
-if let cgImage = cgImage {
-    if let nsImage = nsImageFromContext(context, size: size) {  // Creates CGImage #2
-        nsImage.isTemplate = true
-        return nsImage
-    }
-}
-// CGImage #1 was never used and leaked
+```text
+YabaiAppDelegate.showPanelCentered
+YabaiAppDelegate.captureThumbnail(for:)
+PrivateWindowCapture.captureSpace
+PrivateWindowCapture.captureWindow / captureDisplay
+SLWindowListCreateImage
 ```
 
-### Secondary Issue: CoreGraphics Retention Dependencies
+`leaks` with `MallocStackLogging=1` showed leaked `<CGImage>` roots allocated under SkyLight's `SLWindowListCreateImage` path.
 
-When `context.draw(sourceCGImage, in: rect)` is called, CoreGraphics creates a dependency graph where the final CGImage retains references to the source CGImages. This meant:
+## Correct Release Note
 
-1. `textMask` CGImage created from `maskContext.makeImage()`
-2. Drawn into main context via `context.draw(textMask, in: rect)`
-3. Final CGImage from `context.makeImage()` retained internal references to `textMask`
-4. Even after NSImage creation, these dependencies prevented proper cleanup
+### Memory Leak Fix
 
-### Tertiary Issue: NSImage CGImage Ownership
+This release fixes the verified thumbnail-capture memory leak that caused excessive RAM consumption when repeatedly opening the spaces panel.
 
-When creating `NSImage(cgImage:size:)`, the NSImage doesn't take exclusive ownership of the CGImage. Subsequent operations like `tiffRepresentation` created additional copies while the original CGImage remained allocated.
+### Changes
 
-## Investigation Timeline
+- Replaced private SkyLight window/display thumbnail capture with public `CGDisplayCreateImage()` active-display capture.
+- Preserved real thumbnails for the active visible space.
+- Preserved wallpaper-backed hybrid previews for unvisited spaces.
+- Kept thumbnail and wallpaper cache entries as PNG `Data` instead of long-lived `CGImage` or `NSImage` objects.
+- Removed hotkey registration debug logging in the 1.1.1 cleanup release.
 
-| Attempt | Approach | Leaks | Footprint | Result |
-|---------|----------|-------|----------|--------|
-| Baseline | Original code | 1911 | 7.0G | Severe leaks |
-| 1 | Fixed duplicate CGImage creation | 333 | 1.1G | Improved but leaking |
-| 2 | Added LRU NSImage cache | 145 | 715M | Still accumulating |
-| 3 | Cached CGImage directly | 48 | 228M | Better baseline |
-| 4 | Used autoreleasepool | 89 | 436M | No improvement |
-| 5 | TIFF data caching | 70 | 292M | Slower accumulation |
-| 6 | Removed textMask CGImage | 104 | 442M | Minor improvement |
-| 7 | Removed autoreleasepool | 421 | 1.9G | Made it worse |
-| 8 | PNG data caching + autoreleasepool | 128 | 660M | Bounded leaks |
-| 9 | Added wallpaper back (PNG cached) | 73 | 434M | **Final state** |
+### Verified Metrics
 
-## Fixes Applied
+The verified reproducer was: launch with `MallocStackLogging=1`, trigger the panel hotkey 40 times, then run `leaks <pid>`.
 
-### 1. ImageGenerator.swift - Removed Duplicate CGImage Creation
+| Metric | Before Verified Fix | After Verified Fix |
+|--------|---------------------|--------------------|
+| Leaks | 205 | 0 |
+| Leaked memory | 35,424 bytes | 0 bytes |
+| Physical footprint | 610.5M | 43.8M |
+| Peak physical footprint | Not recorded for old run | 50.8M |
 
-**Before:**
-```swift
-if let cgImage = cgImage {
-    if let nsImage = nsImageFromContext(context, size: size) {
-        nsImage.isTemplate = true
-        return nsImage
-    }
-}
-```
+Longer-running spot checks after the fix also reported `0 leaks for 0 total leaked bytes` with the app footprint in the 25-29M range after several hours.
 
-**After:**
-```swift
-if let cgImage = cgImage {
-    let nsImage = NSImage(cgImage: cgImage, size: size)
-    nsImage.isTemplate = true
-    return nsImage
-}
-```
+## What Was Superseded
 
-### 2. ImageGenerator.swift - Eliminated textMask CGImage
+The older release-note text claimed:
 
-**Before:**
-```swift
-let maskContext = createCGContext(size: size)
-maskContext.clear(rect)
-drawText(context: maskContext, symbol: String(symbol), color: blackColor, size: size, fontSize: fontSize)
+- 96% reduction in CGImage leaks, from 1911 to 73.
+- 95% reduction in leaked memory, from 311KB to 14.8KB.
+- 94% reduction in physical footprint, from 7.0G to 434M.
 
-if let textMask = maskContext.makeImage() {  // CGImage created
-    context.saveGState()
-    context.setBlendMode(.destinationOut)
-    context.setAlpha(active ? 1.0 : 0.8)
-    context.draw(textMask, in: rect)  // Dependencies created
-    context.restoreGState()
-    // textMask leaked due to CoreGraphics retention
-}
-```
+Those numbers are historical investigation data, not the current verified fix. They came from earlier aggregate `leaks` runs and static ownership analysis around CoreGraphics rendering, PNG conversion, and image cache storage. That work reduced risk and remains useful, but the independently verified reproducer showed the active leak was the private SkyLight thumbnail capture path.
 
-**After:**
-```swift
-// Draw text directly with destinationOut blend mode
-// No intermediate CGImage created
-context.saveGState()
-context.setBlendMode(.destinationOut)
-context.setAlpha(active ? 1.0 : 0.8)
-drawText(context: context, symbol: String(symbol), color: blackColor, size: size, fontSize: fontSize)
-context.restoreGState()
-```
+## Fix Details
 
-### 3. ImageGenerator.swift - Immediate PNG Conversion
+### PrivateWindowCapture.swift
 
-Changed from returning CGImage to returning PNG data:
+`captureSpace()` now captures the currently visible display with `CGDisplayCreateImage()`, scales it to thumbnail size, and immediately converts the result to PNG data:
 
 ```swift
-private func generateImageImplCG(...) -> (Data, CGSize) {
-    return autoreleasepool {
-        // ... drawing code ...
-        
-        if let cgImage = context.makeImage() {
-            let pngData = cgImageToPNG(cgImage)  // Immediate conversion
-            if !pngData.isEmpty {
-                return (pngData, size)
-            }
+func captureSpace(windows: [Window], display: Display, targetSize: CGSize) -> Data? {
+    return captureQueue.sync {
+        guard let displayID = getDisplayID(for: display.index),
+              let displayImage = CGDisplayCreateImage(displayID),
+              let scaledImage = scaleImage(displayImage, to: targetSize) else {
+            return nil
         }
-        // ...
-    }
-}
 
-private func cgImageToPNG(_ cgImage: CGImage) -> Data {
-    let data = NSMutableData()
-    guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else {
-        return Data()
-    }
-    CGImageDestinationAddImage(destination, cgImage, nil)
-    CGImageDestinationFinalize(destination)
-    return data as Data
-}
-```
-
-### 4. ButtonImageCache.swift - PNG Data Storage
-
-Changed from storing NSImage to storing raw PNG data:
-
-```swift
-struct CacheEntry {
-    let data: Data      // PNG data, not NSImage
-    let size: CGSize
-    let isTemplate: Bool
-}
-
-class ButtonImageCache {
-    private var numericCache: [NumericImageKey: CacheEntry] = [:]
-    // ...
-    
-    func getNumeric(key: NumericImageKey) -> NSImage? {
-        guard let entry = numericCache[key] else { return nil }
-        updateNumericLRU(key: key)
-        guard let nsImage = NSImage(data: entry.data) else { return nil }
-        nsImage.isTemplate = entry.isTemplate
-        return nsImage
+        return cgImageToPNG(scaledImage)
     }
 }
 ```
 
-### 5. PrivateWindowCapture.swift - PNG Wallpaper Caching
+This avoids `captureWindow()`, `captureDisplay()`, and the private SkyLight `SLWindowListCreateImage` path for active-space thumbnails.
 
-Changed from caching CGImage to caching PNG data:
+### Image Cache Ownership
 
-```swift
-// Before: Cached CGImage caused retention issues
-private var cachedWallpaperCG: CGImage?
+The cache strategy still stores rendered images as PNG `Data` and decodes fresh short-lived images when needed. This avoids long-lived ownership of `CGImage` and `NSImage` objects.
 
-// After: Cache PNG data instead
-private var cachedWallpaperData: Data?
+### Wallpaper Hybrid Previews
 
-func captureDesktopCG(display: Display, targetSize: CGSize) -> CGImage? {
-    if let data = cachedWallpaperData, cachedWallpaperSize == targetSize {
-        return cgImageFromPNG(data)  // Create fresh CGImage each time
-    }
-    // ...
-}
-```
+Wallpaper-backed hybrid previews are preserved. Wallpaper thumbnails are cached as PNG `Data`, keyed by display ID, thumbnail size, and wallpaper path.
 
-### 6. YabaiAppDelegate.swift - Cache Cleanup
+## Additional Fixes Kept
 
-Added cleanup on app termination:
+- `ComposableHotkey` uses unretained CGEventTap user data because `HotkeyManager` owns the hotkey object lifetime.
+- `ComposableHotkey.deinit` invalidates the event tap, removes its run loop source, and clears retained references.
+- `CarbonHotkey.deinit` unregisters the Carbon hotkey.
+- `SocketClient.c` frees request buffers and closes sockets on early failure paths.
 
-```swift
-func applicationWillTerminate(_ notification: Notification) {
-    gButtonImageCache.clear()
-    gThumbnailCache.clear()
-}
-```
-
-## Current State (June 3, 2026)
-
-### Metrics
-- **73 CGImage leaks** (14.8KB total leaked memory)
-- **434M physical footprint** (stable, bounded)
-- Leaks plateau after cache is populated (~30-60 seconds)
-
-### Comparison
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| CGImage Leaks | 1911 | 73 | **96% reduction** |
-| Leaked Memory | 311KB | 14.8KB | **95% reduction** |
-| Physical Footprint | 7.0G | 434M | **94% reduction** |
-
-### Remaining Leaks
-
-The remaining ~73 CGImage leaks appear to be from:
-1. **SwiftUI's internal rendering** - When SwiftUI creates `Image` views from NSImages, it may create additional CGImages for rendering
-2. **NSImage(data:) initialization** - Creating NSImage from PNG data internally creates CGImages
-3. **CoreGraphics framework internals** - Some framework-level CGImage allocations
-
-These leaks are:
-- **Bounded** - They plateau after the cache populates
-- **Small** - Only 14.8KB total
-- **Framework-level** - Not controllable from our code
-
-## Technical Lessons Learned
-
-### 1. CoreGraphics Retention Semantics
-
-When drawing CGImages into a CGContext:
-```swift
-context.draw(sourceCGImage, in: rect)
-let finalCGImage = context.makeImage()
-```
-
-The `finalCGImage` retains internal references to `sourceCGImage`. Even after the original source is released, the dependency persists.
-
-### 2. NSImage Doesn't Own CGImages
-
-```swift
-let nsImage = NSImage(cgImage: cgImage, size: size)
-let tiff = nsImage.tiffRepresentation  // Creates copy
-// cgImage may still be allocated even after nsImage is deallocated
-```
-
-### 3. autoreleasepool is Critical
-
-Without autoreleasepool:
-- CGImages accumulated before cleanup
-- Leak count: 421, Footprint: 1.9G
-
-With autoreleasepool:
-- Timely cleanup of temporary objects
-- Leak count: 73, Footprint: 434M
-
-### 4. Cache Raw Data, Not Objects
-
-Caching NSImage or CGImage directly led to retention issues. Caching PNG data allows:
-- Fresh object creation each time
-- No retention dependencies
-- Proper cleanup when objects go out of scope
-
-## Files Modified
-
-1. **ImageGenerator.swift**
-   - Added `cgImageToPNG()` helper
-   - Changed return type from `(CGImage, CGSize)` to `(Data, CGSize)`
-   - Removed textMask intermediate CGImage
-   - Added `autoreleasepool` wrappers
-   - Added ImageIO and UniformTypeIdentifiers imports
-
-2. **ButtonImageCache.swift**
-   - Changed from storing `CachedImageEntry` with NSImage to storing `CacheEntry` with Data
-   - Simplified cache operations
-
-3. **PrivateWindowCapture.swift**
-   - Changed from caching `CGImage` to caching `PNG data`
-   - Added `cgImageToPNG()` and `cgImageFromPNG()` helpers
-   - Added ImageIO and UniformTypeIdentifiers imports
-
-4. **YabaiAppDelegate.swift**
-   - Added `applicationWillTerminate()` to clear caches
-
-## Verification
-
-To verify the fix:
+## Verification Procedure
 
 ```bash
 # Build the app
 xcodebuild -project YabaiIndicator.xcodeproj -scheme YabaiIndicator -configuration Release build
 
-# Run the app
-~/Library/Developer/Xcode/DerivedData/.../Build/Products/Release/YabaiIndicator.app/Contents/MacOS/YabaiIndicator &
+# Run with malloc stack logging when investigating leaks
+MallocStackLogging=1 ~/Library/Developer/Xcode/DerivedData/.../Build/Products/Release/YabaiIndicator.app/Contents/MacOS/YabaiIndicator &
 
-# Check for leaks
+# Check baseline leaks
 PID=$(pgrep -f YabaiIndicator | head -1)
 leaks $PID
 
-# Expected output:
-# Process <PID>: ~73 leaks for ~14.8K total leaked bytes.
-# Physical footprint: ~434M
+# Trigger the panel repeatedly, then check again
+osascript -e 'repeat 40 times' \
+  -e 'tell application "System Events" to key code 49 using {command down, option down, control down, shift down}' \
+  -e 'delay 0.08' \
+  -e 'end repeat'
+leaks $PID
 ```
 
-## Future Improvements
+Expected result for the verified fix:
 
-Potential areas for further investigation:
-
-1. **SwiftUI Image optimization** - Investigate if using `Image(uiImage:)` instead of `Image(nsImage:)` reduces SwiftUI-side leaks
-
-2. **CGDataProvider analysis** - The 73 leaks are all CGImage with CGDataProvider. Investigate if these can be explicitly managed.
-
-3. **Memory footprint reduction** - 434M is still high for a menu bar app. Could potentially reduce cache size or implement more aggressive eviction.
-
-4. **Framework-level investigation** - Some leaks may be in CoreGraphics/AppKit frameworks. Consider filing radar with Apple.
+```text
+Process <PID>: 0 leaks for 0 total leaked bytes.
+```
 
 ## Date
 
-Last updated: June 3, 2026
+Last updated: June 21, 2026

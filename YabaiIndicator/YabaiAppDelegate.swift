@@ -10,6 +10,7 @@ import Socket
 import Combine
 import Carbon
 import ApplicationServices
+import OSLog
 
 // Custom panel that can become key window even with nonactivating style
 class KeyPanel: NSPanel {
@@ -73,6 +74,9 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     var statusBarItem: NSStatusItem?
     var application: NSApplication = NSApplication.shared
     var spaceModel = SpaceModel()
+
+    // Logger for unified logging
+    private let logger = Logger(subsystem: "com.carcot.YabaiSpaces", category: "Memory")
 
     // Panel manager
     private var panelManager: PanelManager!
@@ -234,7 +238,32 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         statusBarItem?.button?.subviews[0].frame.size.width = newWidth
     }
 
+    // MARK: - Memory Logging
+
+    func logMemoryUsage(context: String = "panel_open") {
+        var info = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size)/4
+
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
+                task_info(mach_task_self_,
+                         task_flavor_t(MACH_TASK_BASIC_INFO),
+                         $0,
+                         &count)
+            }
+        }
+
+        if result == KERN_SUCCESS {
+            let mb = info.resident_size / 1024 / 1024
+            logger.info("Memory usage: \(mb) MB (\(context))")
+        } else {
+            logger.error("Failed to get memory info: \(result)")
+        }
+    }
+
     func showPanel(at mouseLocation: NSPoint, modifiers: PanelModifiers = .none) {
+        logMemoryUsage(context: "panel_open")
+
         // Capture current space thumbnail before showing panel
         if let currentSpace = spaceModel.spaces.first(where: { $0.active }) {
             captureThumbnail(for: currentSpace)
@@ -256,6 +285,8 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     }
 
     func showPanelCentered(modifiers: PanelModifiers = .none) {
+        logMemoryUsage(context: "panel_open_centered")
+
         let mouseLoc = NSEvent.mouseLocation
 
         // Capture current space thumbnail before showing panel
@@ -491,25 +522,42 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         do {
             let socket = try Socket.create(family: .unix, type: .stream, proto: .unix)
             try socket.listen(on: "/tmp/yabai-indicator.socket")
+
             while true {
-                let conn = try socket.acceptClientConnection()
-                let msg = try conn.readString()?.trimmingCharacters(in: .whitespacesAndNewlines)
-                conn.close()
-                // log("Received message: \(msg!).")
-                if msg == "refresh" {
-                    self.refreshData()
-                } else if msg == "refresh spaces" {
-                    Task { @MainActor in
-                        self.onSpaceRefresh()
+                do {
+                    let conn = try socket.acceptClientConnection()
+
+                    // Set socket timeout to prevent hangs
+                    var timeout = timeval(tv_sec: 2, tv_usec: 0)
+                    let sockfd = conn.socketfd
+                    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout)))
+
+                    let msg = try conn.readString()?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    conn.close()
+
+                    if msg == "refresh" {
+                        self.refreshData()
+                    } else if msg == "refresh spaces" {
+                        Task { @MainActor in
+                            self.onSpaceRefresh()
+                        }
+                    } else if msg == "refresh windows" {
+                        Task { @MainActor in
+                            self.onWindowRefresh()
+                        }
                     }
-                } else if msg == "refresh windows" {
-                    Task { @MainActor in
-                        self.onWindowRefresh()
-                    }
+                } catch let error where error is Socket.Error {
+                    // Socket error - log and continue
+                    NSLog("[YabaiSpaces] Socket operation failed: \(error.localizedDescription)")
+                    continue
+                } catch {
+                    // Other errors
+                    NSLog("[YabaiSpaces] Unexpected error in socket server: \(error.localizedDescription)")
+                    continue
                 }
             }
         } catch {
-            // Socket server error
+            NSLog("[YabaiSpaces] Socket server error: \(error.localizedDescription)")
         }
     }
     
@@ -741,6 +789,9 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         }
 
         registerObservers()
+
+        // Log memory usage at startup
+        logMemoryUsage(context: "startup")
     }
 
     func applicationWillTerminate(_ notification: Notification) {

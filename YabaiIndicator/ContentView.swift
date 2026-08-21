@@ -218,7 +218,9 @@ struct ThumbnailSpaceButton : View {
                         }
                 )
             } else {
-                Image(nsImage: generateImage(active: space.active, visible: space.visible, windows: windows, display: displays[0], scale: layout.scale))
+                // Safely get first display, fallback to default if displays array is empty
+                let display = displays.first ?? Display(id: 0, uuid: "fallback", index: 1, frame: .zero)
+                Image(nsImage: generateImage(active: space.active, visible: space.visible, windows: windows, display: display, scale: layout.scale))
                     .onTapGesture { switchSpace() }
                     .frame(width: layout.imageSize.width, height: layout.imageSize.height)
             }
