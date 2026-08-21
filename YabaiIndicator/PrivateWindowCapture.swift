@@ -136,6 +136,8 @@ class PrivateWindowCapture {
 
     /// Capture just the desktop wallpaper for a display (no windows)
     /// Returns NSImage for compatibility with existing code
+    /// Capture just the desktop wallpaper for a display (no windows)
+    /// Returns NSImage for compatibility with existing code
     func captureDesktop(display: Display, targetSize: CGSize) -> NSImage? {
         // Return cached wallpaper if size matches
         if let data = cachedWallpaperData, cachedWallpaperSize == targetSize {
@@ -154,6 +156,9 @@ class PrivateWindowCapture {
     }
 
     /// Capture desktop wallpaper and return CGImage directly (avoid NSImage wrapper leak)
+    /// Capture desktop wallpaper and return CGImage directly (avoid NSImage wrapper leak)
+    /// Capture desktop wallpaper and return CGImage directly (avoid NSImage wrapper leak)
+    /// Capture desktop wallpaper and return CGImage directly (avoid NSImage wrapper leak)
     func captureDesktopCG(display: Display, targetSize: CGSize) -> CGImage? {
         // Create CGImage from cached PNG data if size matches
         if let data = cachedWallpaperData, cachedWallpaperSize == targetSize {
@@ -168,6 +173,8 @@ class PrivateWindowCapture {
             return cgImageFromPNG(pngData)  // Return fresh CGImage from PNG, not original
         }
 
+        // Clear cache on failure to ensure fresh attempts next time
+        clearCaches()
         return nil
     }
 
@@ -202,21 +209,25 @@ class PrivateWindowCapture {
 
     private func loadWallpaperCG(targetSize: CGSize) -> CGImage? {
         let workspace = NSWorkspace.shared
+        
+        // Try all screens to find the desktop wallpaper
+        // This is necessary because NSScreen.main only works for the primary display
+        let screens = NSScreen.screens
+        
+        for screen in screens {
+            if let wallpaperURL = workspace.desktopImageURL(for: screen) {
+                if let imageSource = CGImageSourceCreateWithURL(wallpaperURL as CFURL, nil) {
+                    // Load the image at full resolution
+                    guard let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
+                        continue
+                    }
 
-        // Try to get wallpaper from any screen
-        if let screen = NSScreen.main,
-           let wallpaperURL = workspace.desktopImageURL(for: screen) {
-            if let imageSource = CGImageSourceCreateWithURL(wallpaperURL as CFURL, nil) {
-                // Load the image at full resolution
-                guard let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
-                    return nil
-                }
-
-                // Scale to target size if needed
-                if cgImage.width == Int(targetSize.width) && cgImage.height == Int(targetSize.height) {
-                    return cgImage
-                } else {
-                    return scaleImage(cgImage, to: targetSize)
+                    // Scale to target size if needed
+                    if cgImage.width == Int(targetSize.width) && cgImage.height == Int(targetSize.height) {
+                        return cgImage
+                    } else {
+                        return scaleImage(cgImage, to: targetSize)
+                    }
                 }
             }
         }
@@ -246,9 +257,8 @@ class PrivateWindowCapture {
             context.setFillColor(NSColor.windowBackgroundColor.cgColor)
             context.fill(rect)
 
-            // Capture and draw desktop wallpaper
-            if let displayID = getDisplayID(for: display.index),
-               let desktopImage = captureDisplay(displayID: displayID, targetSize: targetSize) {
+            // Capture and draw desktop wallpaper from file (not current screen content)
+            if let desktopImage = captureDesktopCG(display: display, targetSize: targetSize) {
                 context.draw(desktopImage, in: rect)
             }
 

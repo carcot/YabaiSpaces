@@ -18,14 +18,17 @@ class YabaiClient {
         var cresp:UnsafeMutablePointer<CChar>? = nil
         var cargs = args.map { strdup($0) }
 
+        defer {
+            for ptr in cargs { free(ptr) }
+            if let r = cresp { free(r) }
+        }
+
         let ret = send_message(Int32(args.count), &cargs, &cresp)
 
-        for ptr in cargs { free(ptr) }
         var response = ""
         if let r = cresp {
             response = String(cString: r)
         }
-        free(cresp)
         return (Int(ret), response)
     }
     
@@ -58,7 +61,26 @@ class YabaiClient {
 
     func queryWindows() -> [Window] {
         if let r = yabaiSocketCall("-m", "query", "--windows").response as? [[String: Any]] {
-            let windows = r.compactMap{Window(id: $0["id"] as! UInt64, pid: $0["pid"] as! UInt64, app: $0["app"] as! String, title: $0["title"] as! String, frame: NSRect(x: ($0["frame"] as! [String:Double])["x"]!, y: ($0["frame"] as! [String:Double])["y"]!, width: ($0["frame"] as! [String:Double])["w"]!, height: ($0["frame"] as! [String:Double])["h"]!), displayIndex: $0["display"] as! Int, spaceIndex: $0["space"] as! Int)}
+            let windows = r.compactMap { dict -> Window? in
+                // Safely extract each field with defensive programming
+                guard let id = dict["id"] as? UInt64,
+                      let pid = dict["pid"] as? UInt64,
+                      let app = dict["app"] as? String,
+                      let title = dict["title"] as? String,
+                      let display = dict["display"] as? Int,
+                      let space = dict["space"] as? Int,
+                      let frame = dict["frame"] as? [String: Double],
+                      let x = frame["x"],
+                      let y = frame["y"],
+                      let w = frame["w"],
+                      let h = frame["h"] else {
+                    return nil // Skip malformed entries
+                }
+                
+                return Window(id: id, pid: pid, app: app, title: title,
+                             frame: NSRect(x: x, y: y, width: w, height: h),
+                             displayIndex: display, spaceIndex: space)
+            }
             return windows
         }
         return []

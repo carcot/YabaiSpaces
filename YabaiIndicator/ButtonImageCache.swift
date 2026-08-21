@@ -26,6 +26,13 @@ struct HybridImageKey: Hashable {
     let scale: CGFloat
 }
 
+struct WallpaperImageKey: Hashable {
+    let windowsHash: Int
+    let displayWidth: CGFloat
+    let displayHeight: CGFloat
+    let scale: CGFloat
+}
+
 // MARK: - Cache Entry
 
 struct CacheEntry {
@@ -39,8 +46,10 @@ struct CacheEntry {
 class ButtonImageCache {
     private var numericCache: [NumericImageKey: CacheEntry] = [:]
     private var hybridCache: [HybridImageKey: CacheEntry] = [:]
+    private var wallpaperCache: [WallpaperImageKey: CacheEntry] = [:]
     private var numericAccessOrder: [NumericImageKey] = []
     private var hybridAccessOrder: [HybridImageKey] = []
+    private var wallpaperAccessOrder: [WallpaperImageKey] = []
     private let maxCacheSize: Int
 
     init(maxCacheSize: Int = 100) {
@@ -57,6 +66,11 @@ class ButtonImageCache {
         hybridAccessOrder.append(key)
     }
 
+    private func updateWallpaperLRU(key: WallpaperImageKey) {
+        wallpaperAccessOrder.removeAll { $0 == key }
+        wallpaperAccessOrder.append(key)
+    }
+
     private func evictNumericIfNeeded() {
         while numericCache.count > maxCacheSize {
             if let oldest = numericAccessOrder.first {
@@ -71,6 +85,15 @@ class ButtonImageCache {
             if let oldest = hybridAccessOrder.first {
                 hybridCache.removeValue(forKey: oldest)
                 hybridAccessOrder.removeFirst()
+            }
+        }
+    }
+
+    private func evictWallpaperIfNeeded() {
+        while wallpaperCache.count > maxCacheSize {
+            if let oldest = wallpaperAccessOrder.first {
+                wallpaperCache.removeValue(forKey: oldest)
+                wallpaperAccessOrder.removeFirst()
             }
         }
     }
@@ -103,13 +126,27 @@ class ButtonImageCache {
         evictHybridIfNeeded()
     }
 
+    func getWallpaper(key: WallpaperImageKey) -> NSImage? {
+        guard let entry = wallpaperCache[key] else { return nil }
+        updateWallpaperLRU(key: key)
+        guard let nsImage = NSImage(data: entry.data) else { return nil }
+        nsImage.isTemplate = entry.isTemplate
+        return nsImage
+    }
+
+    func setWallpaper(key: WallpaperImageKey, data: Data, size: CGSize, isTemplate: Bool) {
+        wallpaperCache[key] = CacheEntry(data: data, size: size, isTemplate: isTemplate)
+        updateWallpaperLRU(key: key)
+        evictWallpaperIfNeeded()
+    }
+
     func clear() {
         numericCache.removeAll()
         hybridCache.removeAll()
+        wallpaperCache.removeAll()
         numericAccessOrder.removeAll()
         hybridAccessOrder.removeAll()
-        // Also clear wallpaper cache to free leaked CGImage resources
-        gPrivateWindowCapture.clearCaches()
+        wallpaperAccessOrder.removeAll()
     }
 }
 

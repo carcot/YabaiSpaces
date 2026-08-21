@@ -293,15 +293,14 @@ private func drawWindowOutlines(context: CGContext, windows: [Window], display: 
 func generateHybridPreviewImage(active: Bool, visible: Bool, windows: [Window], display: Display, scale: CGFloat = 1.0) -> NSImage {
     let windowsHash = windows.map { "\($0.id)\($0.frame.origin.x)\($0.frame.origin.y)\($0.frame.width)\($0.frame.height)" }.joined().hashValue
 
-    let key = HybridImageKey(
-        active: active,
-        visible: visible,
+    let key = WallpaperImageKey(
         windowsHash: windowsHash,
         displayWidth: display.frame.width,
         displayHeight: display.frame.height,
         scale: scale
     )
-    if let cached = gButtonImageCache.getHybrid(key: key) {
+    
+    if let cached = gButtonImageCache.getWallpaper(key: key) {
         return cached
     }
 
@@ -313,10 +312,14 @@ func generateHybridPreviewImage(active: Bool, visible: Bool, windows: [Window], 
 
         let context = createCGContext(size: size)
 
-        // Use solid color background (wallpaper removed to prevent CGImage leaks)
-        // Window outlines provide sufficient visual feedback
-        context.setFillColor(NSColor(red: 0.3, green: 0.35, blue: 0.45, alpha: 1.0).cgColor)
-        context.fill(rect)
+        // Draw desktop wallpaper as background (direct CGImage drawing to avoid leaks)
+        if let wallpaperCG = gPrivateWindowCapture.captureDesktopCG(display: display, targetSize: size) {
+            context.draw(wallpaperCG, in: rect)
+        } else {
+            // Fallback to solid color if wallpaper load fails
+            context.setFillColor(NSColor(red: 0.3, green: 0.35, blue: 0.45, alpha: 1.0).cgColor)
+            context.fill(rect)
+        }
 
         // Draw window outlines
         drawWindowOutlines(context: context, windows: windows, display: display, targetSize: size)
@@ -324,7 +327,7 @@ func generateHybridPreviewImage(active: Bool, visible: Bool, windows: [Window], 
         if let cgImage = context.makeImage() {
             let pngData = cgImageToPNG(cgImage)
             if !pngData.isEmpty {
-                gButtonImageCache.setHybrid(key: key, data: pngData, size: size, isTemplate: false)
+                gButtonImageCache.setWallpaper(key: key, data: pngData, size: size, isTemplate: false)
                 return NSImage(data: pngData)!
             }
         }

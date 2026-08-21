@@ -1,5 +1,80 @@
 # Session Log
 
+## 2026-08-21: Desktop Wallpaper Loading Fix
+
+### Problem
+Desktop wallpaper loading had been removed in commit `ae254c4` to fix CGImage memory leaks, resulting in gray/black backgrounds instead of actual desktop wallpapers in hybrid preview mode.
+
+### Root Causes
+- **Primary issue**: Initial fix used NSImage drawing (`wallpaper.draw(in: rect)`) which caused CGImage memory leaks
+- **Secondary issue**: Single-screen focus in `loadWallpaperCG()` - only tried `NSScreen.main`
+- **Cache collision**: Both `generateImage` and `generateHybridPreviewImage` used same cache, causing overwrites
+- **Logic error**: Reversed guard statement in `YabaiClient.queryWindows()` with reversed guard statement logic
+
+### Solution
+**Restored direct CGImage drawing** (memory-safe):
+- Changed from `NSImage.draw(in: rect)` to `context.draw(cgImage, in: rect)`
+- Matches original pre-leak approach from commit `ce328c8`
+- Maintains leak-free behavior while restoring wallpapers
+
+**Multi-screen wallpaper loading**:
+- Updated `PrivateWindowCapture.loadWallpaperCG()` to iterate through all `NSScreen.screens`
+- Falls back through screens if one fails
+- More robust in multi-display setups
+
+**Separate wallpaper cache**:
+- Added `WallpaperImageKey` struct and dedicated `wallpaperCache`
+- Prevents cache collisions between window-style and wallpaper-style previews
+- Added LRU management for wallpaper cache
+
+**Fixed YabaiClient logic error**:
+- Corrected guard statement in `queryWindows()` - now properly skips malformed entries
+- Window creation moved to success path after all fields validated
+
+### Files Modified
+- `YabaiIndicator/PrivateWindowCapture.swift`:
+  - `loadWallpaperCG()`: Changed from single-screen to multi-screen iteration
+  - `captureDesktopCG()`: Updated for consistency
+  - `captureDesktop()`: Updated for consistency
+- `YabaiIndicator/ImageGenerator.swift`:
+  - `generateHybridPreviewImage()`: Restored direct CGImage drawing, uses wallpaper cache
+- `YabaiIndicator/ButtonImageCache.swift`:
+  - Added `WallpaperImageKey` struct
+  - Added `wallpaperCache` and LRU methods
+  - Added `getWallpaper()` and `setWallpaper()` methods
+- `YabaiIndicator/Connectors/YabaiClient.swift`:
+  - `queryWindows()`: Fixed guard statement logic
+
+### Testing
+- ✅ Build succeeded with no errors
+- ✅ Wallpapers display correctly in hybrid previews
+- ✅ Maintains memory-safe approach (no CGImage leaks)
+- ✅ Multi-display support improved
+  - `queryWindows()`: Fixed guard statement logic
+
+### Testing
+- ✅ Build succeeded with no errors
+- App launches and runs successfully
+- Maintains existing PNG caching strategy for memory safety
+- More robust wallpaper loading across all displays
+
+## 2026-06-21: Correct Memory Leak Release Notes
+
+### Problem
+The memory leak release-note language still described the older `1911 -> 73` investigation as the current fix, even though runtime verification showed the actual leak was the private SkyLight thumbnail capture path.
+
+### Solution
+- Replaced the old percentage-reduction release-note language with the verified SkyLight leak explanation.
+- Documented the measured before/after reproducer: 205 leaks and 35,424 leaked bytes before the fix, 0 leaks and 0 leaked bytes after the fix.
+- Preserved the older `1911 -> 73` data only as superseded historical investigation context.
+
+### Files Modified
+- `MEMORY_LEAK_FIX.md`: Rewritten around the verified root cause, corrected release-note copy, and current verification procedure.
+- `SESSION_LOG.md`: Documents this documentation correction.
+
+### Testing
+- Documentation-only change; no build required.
+
 ## 2025-03-13: Fix Thumbnail Race Condition - Use SpaceID Instead of UUID
 
 ### Problem
