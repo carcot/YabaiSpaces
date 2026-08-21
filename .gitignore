@@ -1,3 +1,36 @@
 xcuserdata/
 .DS_Store
+# Ignore generic DMG name but allow versioned DMGs
 YabaiSpaces.dmg
+
+# Xcode build artifacts
+build/
+Build/
+DerivedData/
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+
+# Swift Package Manager
+.swiftpm/
+.build/
+Package.resolved
+
+# Module cache
+ModuleCache.noindex/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary files
+*.swp
+*.swo
+*~

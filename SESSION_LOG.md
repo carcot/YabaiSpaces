@@ -56,6 +56,43 @@ This section consolidates all incomplete work and potential future improvements 
 
 ---
 
+## 2026-08-21: Right Shift Toggle Behavior and Memory Logging
+
+### Problem
+User reported that YabaiSpaces crashed after acting strangely. No crash logs were available in DiagnosticReports. The right shift hotkey was implemented as `.show` instead of `.toggle`, meaning it would only show the panel, not hide it.
+
+### Changes Made
+
+**1. Right Shift Toggle Behavior**
+- Changed right shift hotkey action from `.show(panelPosition)` to `.toggle(panelPosition)`
+- Now right shift quick tap (< 0.25s) toggles panel visibility (shows if hidden, hides if visible)
+- File: `YabaiIndicator/YabaiAppDelegate.swift`, line 454
+
+**2. Memory Usage Logging**
+- Added `logMemoryUsage(context:)` function using `mach_task_basic_info` to get resident memory size
+- Logs memory usage at startup with context "startup"
+- Logs memory usage every time panel is opened (via `showPanel` or `showPanelCentered`)
+- Log format: `[YabaiSpaces] Memory usage: XX MB (context)`
+- Purpose: Help identify memory leaks or unusual memory growth patterns
+- Can be viewed in Console.app by filtering for "YabaiSpaces" or "Memory usage"
+
+### Files Modified
+- `YabaiIndicator/YabaiAppDelegate.swift`: Toggle behavior fix, memory logging
+- `SESSION_LOG.md`: Documentation
+
+### Testing
+- Release build succeeded (no errors, only unrelated warnings)
+- Right shift now toggles panel instead of only showing it
+- Memory logging active and can be monitored via Console.app
+
+### Crash Investigation
+- No crash logs found in `~/Library/Logs/DiagnosticReports/`
+- No relevant errors found in system logs for YabaiSpaces
+- User behavior before crash unknown
+- Memory logging will help identify if memory issues contribute to future crashes
+
+---
+
 ## 2026-08-10: Add Socket Timeouts and Error Isolation to Prevent Hangs
 
 ### Problem

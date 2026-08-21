@@ -253,7 +253,31 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         statusBarItem?.button?.subviews[0].frame.size.width = newWidth
     }
 
+    // MARK: - Memory Logging
+
+    func logMemoryUsage(context: String = "panel_open") {
+        var info = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size)/4
+
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
+                task_info(mach_task_self_,
+                         task_flavor_t(MACH_TASK_BASIC_INFO),
+                         $0,
+                         &count)
+            }
+        }
+
+        if result == KERN_SUCCESS {
+            let mb = info.resident_size / 1024 / 1024
+            NSLog("[YabaiSpaces] Memory usage: \(mb) MB (\(context))")
+        }
+    }
+
     func showPanel(at mouseLocation: NSPoint, modifiers: PanelModifiers = .none) {
+        // Log memory when panel is opened
+        logMemoryUsage(context: "panel_open")
+
         // Capture current space thumbnail before showing panel
         if let currentSpace = spaceModel.spaces.first(where: { $0.active }) {
             captureThumbnail(for: currentSpace)
@@ -275,6 +299,9 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     }
 
     func showPanelCentered(modifiers: PanelModifiers = .none) {
+        // Log memory when panel is opened
+        logMemoryUsage(context: "panel_open_centered")
+
         let mouseLoc = NSEvent.mouseLocation
 
         // Capture current space thumbnail before showing panel
@@ -445,13 +472,13 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
                 modifiers: UInt32(cmdKey | optionKey | controlKey | shiftKey),
                 action: .show(panelPosition)
             ),
-            // Right Shift - show panel on quick tap
+            // Right Shift - toggle panel on quick tap
             // Uses tap trigger with 0.25s threshold to distinguish tap from hold
             HotkeyBinding(
                 id: 3,
                 keyCode: 60,  // Right Shift
                 modifiers: 0,
-                action: .show(panelPosition),
+                action: .toggle(panelPosition),
                 trigger: .tap(threshold: 0.25),
                 detectTyping: true
             ),
@@ -819,7 +846,10 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         }
 
         registerObservers()
-        
+
+        // Log memory usage at startup
+        logMemoryUsage(context: "startup")
+
         // Initial data fetch to populate spaces on startup
         refreshData()
     }

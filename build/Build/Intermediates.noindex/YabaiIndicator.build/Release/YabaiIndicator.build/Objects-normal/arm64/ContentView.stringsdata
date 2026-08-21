@@ -7,7 +7,7 @@
         "key": "%lld",
         "location": {
           "startingColumn": 26,
-          "startingLine": 358
+          "startingLine": 370
         }
       },
       {
@@ -15,7 +15,7 @@
         "key": "About",
         "location": {
           "startingColumn": 20,
-          "startingLine": 442
+          "startingLine": 454
         }
       },
       {
@@ -23,7 +23,7 @@
         "key": "Preferences...",
         "location": {
           "startingColumn": 20,
-          "startingLine": 446
+          "startingLine": 458
         }
       },
       {
@@ -31,7 +31,7 @@
         "key": "Toggle Button Style",
         "location": {
           "startingColumn": 20,
-          "startingLine": 450
+          "startingLine": 462
         }
       },
       {
@@ -39,7 +39,7 @@
         "key": "Quit YabaiIndicator",
         "location": {
           "startingColumn": 20,
-          "startingLine": 461
+          "startingLine": 473
         }
       }
     ]

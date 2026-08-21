@@ -1,6 +1,0 @@
-Target dependency graph (3 targets)
-Target 'YabaiIndicator' in project 'YabaiIndicator'
-➜ Explicit dependency on target 'Socket' in project 'Socket'
-Target 'Socket' in project 'Socket'
-➜ Explicit dependency on target 'Socket' in project 'Socket'
-Target 'Socket' in project 'Socket' (no dependencies)
