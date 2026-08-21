@@ -50,11 +50,6 @@ context.setFillColor(NSColor(red: 0.3, green: 0.35, blue: 0.45, alpha: 1.0).cgCo
 context.fill(rect)  // Gray background, no leaks
 ```
 
-### Next Steps
-1. **Revert commit `4940905`** to restore memory-safe behavior
-2. **Keep gray backgrounds** until a truly leak-free wallpaper approach is found
-3. **Investigate alternatives**: Pre-rendered PNG wallpapers, different rendering pipeline, etc.
-
 ### Lessons Learned
 - Don't assume "direct" drawing is safer than NSImage drawing
 - Test with `leaks` tool during development, not just basic functionality

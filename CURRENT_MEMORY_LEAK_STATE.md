@@ -83,46 +83,6 @@ context.fill(rect)
 
 The solution was **removing wallpapers entirely**, not changing the drawing method.
 
-## What Needs to Happen Next
-
-### Immediate Options
-1. **Revert wallpaper fix**: Go back to gray backgrounds (memory-safe)
-2. **Find truly memory-safe wallpaper rendering**: Investigate alternative approaches
-3. **Accept the leak**: Keep wallpapers but document the memory issue
-
-### Investigation Needed
-- Are there any wallpaper rendering approaches that don't leak?
-- Can we pre-render wallpapers as PNG and avoid CGImage entirely?
-- Is the leak in the wallpaper loading or the hybrid preview generation?
-
-## Evidence Files
-
-### Current Log Output
-```
-2026-08-21 19:05:25.361 YabaiIndicator[17891] Memory usage: 75 MB (startup)
-2026-08-21 19:06:01.255 YabaiIndicator[17891] Memory usage: 81 MB (panel_open_centered)
-2026-08-21 19:06:29.893 YabaiIndicator[17891] Memory usage: 91 MB (panel_open_centered)
-2026-08-21 19:07:07.201 YabaiIndicator[17891] Memory usage: 97 MB (panel_open_centered)
-2026-08-21 19:08:17.043 YabaiIndicator[17891] Memory usage: 103 MB (panel_open_centered)
-2026-08-21 19:08:45.022 YabaiIndicator[17891] Memory usage: 108 MB (panel_open_centered)
-2026-08-21 19:08:47.237 YabaiIndicator[17891] Memory usage: 114 MB (panel_open_centered)
-2026-08-21 19:08:48.965 YabaiIndicator[17891] Memory usage: 119 MB (panel_open_centered)
-2026-08-21 19:08:50.572 YabaiIndicator[17891] Memory usage: 120 MB (panel_open_centered)
-2026-08-21 19:08:52.427 YabaiIndicator[17891] Memory usage: 126 MB (panel_open_centered)
-```
-
-### Leaks Tool Output
-```
-Process 17891: 84 leaks for 14544 total leaked bytes
-    84 (14.2K) << TOTAL >>
-      3 (672 bytes) ROOT LEAK: <CGImage 0xca4074f00> [320]
-         2 (352 bytes) <CGDataProvider 0xca4076bc0> [320]
-            1 (32 bytes) 0xca65d8b00 [32]
-      3 (672 bytes) ROOT LEAK: <CGImage 0xca4075680> [320]
-         2 (352 bytes) <CGDataProvider 0xca4076800> [320]
-            1 (32 bytes) 0xca505d860 [32]
-```
-
 ## Summary
 
 **We successfully restored wallpapers but reintroduced the exact memory leak that was fixed in commit `ae254c4`.** The direct CGImage drawing approach is not memory-safe, and we now have 84 CGImage leaks causing 51 MB of memory growth.
