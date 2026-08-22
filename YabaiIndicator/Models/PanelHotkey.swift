@@ -7,6 +7,28 @@
 
 import AppKit
 
+enum PanelCommand: String, CaseIterable {
+    case show = "panel show"
+    case hide = "panel hide"
+    case toggle = "panel toggle"
+    case activateSelected = "panel activate-selected"
+    case activateSelectedOrShow = "panel activate-selected-or-show"
+
+    enum Operation: Equatable {
+        case show, hide, activateSelected, none
+    }
+
+    func operation(isVisible: Bool) -> Operation {
+        switch self {
+        case .show: return isVisible ? .none : .show
+        case .hide: return isVisible ? .hide : .none
+        case .toggle: return isVisible ? .hide : .show
+        case .activateSelected: return isVisible ? .activateSelected : .none
+        case .activateSelectedOrShow: return isVisible ? .activateSelected : .show
+        }
+    }
+}
+
 /// Positioning behavior for showing the panel
 enum PanelPositioning: Equatable {
     case atMouse(NSPoint)           // Position at specific point (usually cursor)
@@ -18,6 +40,7 @@ enum PanelHotkeyAction: Equatable {
     case toggle(PanelPositioning)
     case show(PanelPositioning)
     case hide
+    case confirmOrShow(PanelPositioning)
 }
 
 /// Additional behaviors to apply after showing panel
@@ -64,5 +87,6 @@ protocol PanelHotkeyDelegate: AnyObject {
     func showPanel(at position: NSPoint, modifiers: PanelModifiers)
     func showPanelCentered(modifiers: PanelModifiers)
     func hidePanel()
+    func confirmPanelSelection()
     func handleKeyEvent(_ event: NSEvent) -> Bool
 }

@@ -75,9 +75,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     var application: NSApplication = NSApplication.shared
     var spaceModel = SpaceModel()
 
-    // Logger for unified logging
-    private let logger = Logger(subsystem: "com.carcot.YabaiSpaces", category: "Memory")
-
     // Panel manager
     private var panelManager: PanelManager!
 
@@ -255,9 +252,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
         if result == KERN_SUCCESS {
             let mb = info.resident_size / 1024 / 1024
-            logger.info("Memory usage: \(mb) MB (\(context))")
-        } else {
-            logger.error("Failed to get memory info: \(result)")
+            NSLog("[YabaiSpaces] Memory usage: \(mb) MB (\(context))")
         }
     }
 
@@ -300,6 +295,19 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
     func hidePanel() {
         panelManager?.hide()
+    }
+
+    func confirmPanelSelection() {
+        guard floatingPanel?.isVisible == true else { return }
+        let spaces = spaceModel.spaces.filter { $0.type == .standard }
+        let selectedIndex = panelSelectedIndex ?? spaces.firstIndex(where: { $0.active }) ?? 0
+        if spaces.indices.contains(selectedIndex) {
+            let selectedSpace = spaces[selectedIndex]
+            if !selectedSpace.active && selectedSpace.yabaiIndex > 0 {
+                switchSpace(to: selectedSpace.yabaiIndex)
+            }
+        }
+        hidePanel()
     }
 
     @objc
@@ -408,13 +416,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
                 newIndex = rowStart
             }
         case 36, 49: // Return or Space
-            // Always hide panel - if different space selected, switch to it first
-            let selectedSpace = spaces[currentIndex]
-            if !selectedSpace.active && selectedSpace.yabaiIndex > 0 {
-                switchSpace(to: selectedSpace.yabaiIndex)
-            }
-            // Always hide panel after selection
-            hidePanel()
+            confirmPanelSelection()
             return true
         case 53: // Escape
             hidePanel()
@@ -457,15 +459,11 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
                 modifiers: UInt32(cmdKey | optionKey | controlKey | shiftKey),
                 action: .toggle(panelPosition)
             ),
-            // Right Shift - toggle panel on quick tap
-            // Uses tap trigger with 0.25s threshold to distinguish tap from hold
             HotkeyBinding(
                 id: 3,
-                keyCode: 60,  // Right Shift
-                modifiers: 0,
-                action: .toggle(panelPosition),
-                trigger: .tap(threshold: 0.25),
-                detectTyping: true
+                keyCode: 79,
+                modifiers: UInt32(cmdKey | optionKey | controlKey | shiftKey),
+                action: .confirmOrShow(panelPosition)
             ),
         ]
 
@@ -518,24 +516,77 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         }
     }
 
+    @MainActor
+    func executePanelCommand(_ command: PanelCommand) {
+        switch command.operation(isVisible: floatingPanel?.isVisible == true) {
+        case .show:
+            if UserDefaults.standard.gridPosition == .centered {
+                showPanelCentered()
+            } else {
+                showPanel(at: NSEvent.mouseLocation)
+            }
+        case .hide: hidePanel()
+        case .activateSelected: confirmPanelSelection()
+        case .none: break
+        }
+    }
+
+    private func readSocketMessage(_ descriptor: Int32) -> String? {
+        let deadline = ProcessInfo.processInfo.systemUptime + 2
+        var bytes: [UInt8] = []
+        while bytes.count <= 256 {
+            let remaining = deadline - ProcessInfo.processInfo.systemUptime
+            guard remaining > 0 else { return nil }
+            var event = pollfd(fd: descriptor, events: Int16(POLLIN), revents: 0)
+            guard poll(&event, 1, Int32(remaining * 1000)) > 0 else { return nil }
+            var buffer = [UInt8](repeating: 0, count: 257 - bytes.count)
+            let count = recv(descriptor, &buffer, buffer.count, 0)
+            if count == 0 {
+                return String(bytes: bytes, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            guard count > 0 else { return nil }
+            bytes.append(contentsOf: buffer.prefix(count))
+            guard bytes.count <= 256 else { return nil }
+            if let newline = bytes.firstIndex(of: 10) {
+                guard bytes[(newline + 1)...].allSatisfy({ $0 == 10 || $0 == 13 }) else { return nil }
+                return String(bytes: bytes[..<newline], encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        return nil
+    }
+
     func socketServer() async {
         do {
             let socket = try Socket.create(family: .unix, type: .stream, proto: .unix)
             try socket.listen(on: "/tmp/yabai-indicator.socket")
+            guard chmod("/tmp/yabai-indicator.socket", 0o600) == 0 else {
+                throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+            }
 
             while true {
                 do {
                     let conn = try socket.acceptClientConnection()
+                    defer { conn.close() }
 
                     // Set socket timeout to prevent hangs
                     var timeout = timeval(tv_sec: 2, tv_usec: 0)
                     let sockfd = conn.socketfd
                     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout)))
+                    setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout)))
+                    var noSignal: Int32 = 1
+                    setsockopt(sockfd, SOL_SOCKET, SO_NOSIGPIPE, &noSignal, socklen_t(MemoryLayout.size(ofValue: noSignal)))
+                    var peerUser: uid_t = 0
+                    var peerGroup: gid_t = 0
+                    guard getpeereid(sockfd, &peerUser, &peerGroup) == 0, peerUser == getuid() else { continue }
 
-                    let msg = try conn.readString()?.trimmingCharacters(in: .whitespacesAndNewlines)
-                    conn.close()
+                    let msg = readSocketMessage(sockfd)
+                    var accepted = true
 
-                    if msg == "refresh" {
+                    if let msg = msg, let command = PanelCommand(rawValue: msg) {
+                        Task { @MainActor in
+                            self.executePanelCommand(command)
+                        }
+                    } else if msg == "refresh" {
                         self.refreshData()
                     } else if msg == "refresh spaces" {
                         Task { @MainActor in
@@ -545,6 +596,12 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
                         Task { @MainActor in
                             self.onWindowRefresh()
                         }
+                    } else {
+                        accepted = false
+                    }
+                    let reply = accepted ? "ok queued\n" : "error invalid-command\n"
+                    reply.withCString { pointer in
+                        _ = send(sockfd, pointer, reply.utf8.count, 0)
                     }
                 } catch let error where error is Socket.Error {
                     // Socket error - log and continue

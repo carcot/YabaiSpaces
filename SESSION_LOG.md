@@ -1,5 +1,133 @@
 # Session Log
 
+## 2026-09-13: Publication preparation and confirmed working state
+
+User confirmed the installed skhd F18 command route opens the panel and activates its selection. User subsequently confirmed Desktop icons render after deploying VdlD77. Updated current-state documentation to supersede earlier pending-verification notes. Preserved all project changes, including the preexisting Serena configuration and logging changes; excluded generated Python bytecode. The live skhd rule is documented in docs/PANEL_COMMANDS.md; unrelated machine configuration and credentials are not source artifacts.
+
+Recorded the driver-protocol incompatibility, diagnostic hang and competing-grabber findings in docs/SKHD_GRABBER_RESEARCH.md with primary sources. No upstream fix date was found; migration remains deferred. Remaining work is auditing redundant YS keyboard handlers and creating a new durable archive of the latest confirmed app, not changing rendering, MRU, previous-Space, Caps or Tab behavior.
+
+Publication checks: all four changed Swift files parse; run.sh passes bash syntax validation; all three Python files compile and import; all 16 focused tests pass. The exact capture/command source previously passed the full isolated Xcode build and user visual testing. Documentation whitespace checks pass. This publication operation does not rebuild, reinstall or restart the working desktop services.
+
+Removed an embedded authentication token from the local fork remote URL without recording its value. Token revocation/rotation is still required; changing the URL does not revoke it. SSH authentication to origin failed; clean HTTPS fetch from fork succeeded. GitHub main differs from this detached tested checkout, so a separate publication branch was proposed rather than rewriting main or merging unrelated release/build changes. Commit and push outcomes must be verified separately.
+
+## 2026-09-13: Restore omitted historical Desktop-icon capture fix
+
+After semantic-command deployment the user reported missing Desktop icons in thumbnails. That build used the detached checkout's wallpaper-plus-yabai-windows compositor, which excludes Finder Desktop icons. The deployment had not preserved the display-capture fix already present in Git commits 5ef0524 and 5b56676. Successful panel activation was not sufficient rendering regression coverage.
+
+Restored only the historical captureSpace implementation: CGDisplayCreateImage for the visible display, scale, immediately encode PNG Data. No private per-window capture is used by this method now. Kept all semantic commands, existing capture timing, panel selection, keyboard bindings and MRU behavior unchanged. Did not touch Finder, Desktop files, iCloud, or TCC grants. This is restoration of an existing implementation, not another capture-framework experiment.
+
+Swift syntax validation passed immediately after the edit. Full isolated signed build VdlD77 succeeded; all nine panel-command tests passed. Installed that exact build at /Applications/YabaiSpaces.app after strict matching-signature and staged byte-comparison checks; restarted as PID 82181 and verified the command socket. Previous semantic-command app retained at ~/Library/Application Support/YabaiSpaces/Backups/icons-20260913.zY2L1M/YabaiSpaces.app. Earlier confirmed baseline backups are unchanged. Actual Desktop-icon pixels still require user confirmation; builds and socket acknowledgments do not establish visual success. Thumbnails are in memory and regenerate as each active Space is captured when opening the panel.
+
+## 2026-09-13: Deploy semantic panel dispatch after user-confirmed activation
+
+Repeated the controlled panel test with a 30-second selection interval. Active Space changed from index 8 to 5, and the user confirmed the panel closed and activated the highlighted Space. On explicit deployment authorization, installed the exact tested lQCqv5 bundle at `/Applications/YabaiSpaces.app`. Verified strict signing, matching designated requirement, and staged byte comparison before replacement. Retained verified old app and config backups under `~/Library/Application Support/YabaiSpaces/Backups/deploy-20260913.yiAot8/`; earlier baseline archive remains unchanged.
+
+Replaced only `f18 | hyper - f18` with the absolute Python/helper invocation of `panel activate-selected-or-show`. Karabiner still recognizes right-Shift taps; skhd dispatches semantic intent; YS owns visibility and selection. No BTT, MRU, previous-Space, Caps, Tab, Hammerspoon, grabber, or iCloud changes. No source rebuild or commit. SIP enabled; yabai animation duration zero.
+
+Nine automated command tests passed again. Validated helper syntax/import, shell syntax, and exact single-line config replacement immediately after editing. Reloaded the same skhd PID 2401; status reports an active event tap and no grabber. Installed YS PID 67743 acknowledged hide and closed-panel activation commands and passed strict signing verification. Physical right-Shift dispatch and post-install visual behavior remain user checks. TCC logs include an AppleEvents entitlement warning; no permission reset or entitlement edits were made. Documentation whitespace checks passed. See docs/PANEL_COMMANDS.md for rollback instructions and verification boundaries.
+
+## 2026-09-13: Controlled live panel-command test; baseline restored
+
+User requested testing. Verified matching signing requirement, gracefully stopped baseline PID 57400, and launched lQCqv5 as PID 62205. All five panel commands acknowledged. Tested invalid old command name, multiple commands in one frame, oversized frame, refresh windows compatibility and idle read timeout against the live server: expected replies, with idle rejection at 2.0 seconds. Socket was mode 0600. TCC logged authorized ScreenCapture results for the test build; no permission resets or grants occurred.
+
+The activation/toggle sequence left the active Space unchanged as expected when activating the initial current-Space selection. Actual visible panel transitions, cursor behavior, screenshots and activation of another selected target remain unverified: yabai does not enumerate this panel, and the user has not yet supplied visual confirmation. Do not describe acknowledgment alone as full UI success.
+
+Stopped the test process and restored `/Applications/YabaiSpaces.app`. Its bundle and all live bindings remain unchanged; nothing was installed. See docs/PANEL_COMMANDS.md for exact test coverage. Documentation whitespace checks passed.
+
+## 2026-09-13: Semantic panel socket commands implemented, not deployed
+
+Implemented show, hide, toggle, activate-selected and activate-selected-or-show messages on the existing local socket. Exact allowlisted commands resolve panel visibility on the main actor and reuse existing show/hide/Return behavior. Added same-user peer checks, 0600 socket mode, bounded/deadlined reads and queued/error acknowledgments. Existing refresh messages and high-level hotkeys remain compatible. Added ysctl.py with no app auto-launch, bounded acknowledgment reads and explicit failures.
+
+Before building, restored PrivateWindowCapture to HEAD and removed only the experimental asynchronous thumbnail property/block from YabaiAppDelegate. The capture experiments are retained in the previously checksum-verified baseline backup; right-Shift and prior logging changes remain. This supersedes the WORKING_BASELINE inventory's statement that capture experiments remain in active source. No branch/reset/commit was performed.
+
+Immediate Swift/Python syntax checks and Python import checks passed. Nine automated tests passed, including real local fake-server exchanges and a compiled Swift harness for production dispatch decisions and framing. The first test run caught shutdown racing a server close; removed unnecessary shutdown from the newline-framed helper and reran successfully. Full isolated build lQCqv5 succeeded and passed strict matching designated-requirement verification. No live panel commands were sent; PID 57400 still runs the unchanged Applications app and skhd still forwards F18 to Hyper-F18. Physical UI behavior and Screen Recording authorization remain deployment checks. See docs/PANEL_COMMANDS.md for protocol, limitations and invocation.
+
+## 2026-09-13: Freeze user-confirmed working binary; no further experiments
+
+User confirms the current app works and requests preservation plus source review. Verified PID 57400 runs `/Applications/YabaiSpaces.app`. Archived the exact signed bundle outside iCloud at `~/Library/Application Support/YabaiSpaces/Backups/confirmed-20260913.qZ8UzV/YabaiSpaces-working.zip`. Extracted backup, recursive comparison and strict signature validation passed. Archived current tracked diff and selected changed/untracked sources separately, with SHA-256 checksums.
+
+`docs/WORKING_BASELINE.md` records binary identity, backup location and mixed-source inventory. Capture experiments remain in the working tree, explicitly not validated for deployment; right-Shift and logging changes must not be removed with them wholesale. The earlier capture-restoration plan is paused. No app restart, build, branch change, source-code edit, permission reset or input/iCloud change occurred. Documentation whitespace validation passed.
+
+## 2026-09-13: ScreenCaptureKit thumbnail migration under live test
+
+User reported white window rectangles after the ABI correction. Those rectangles were the explicit capture-failure fallback, not captured content; the previous change did not resolve screenshots. On macOS 14+, now use SCShareableContent and SCScreenshotManager with desktop-independent window filters, stable window IDs, thumbnail-sized output, no cursor and no window shadows. Missing permission, missing windows, or capture errors return no new thumbnail and are logged. The compositor no longer caches white placeholders. Older systems retain the corrected legacy call.
+
+Capture requests are asynchronous so panel opening and navigation do not wait for screenshots. Each request keeps its originating Space ID and window list. A newer request for the same Space cancels the previous task and canceled results cannot overwrite the cache. This changes snapshot timing: pixels are obtained asynchronously, not guaranteed at the exact instant before switching. No MRU or Space-switching commands were changed. Existing outline fallback remains while no thumbnail is available.
+
+Immediate Swift parsing and isolated full Xcode build passed. Strict signing matched the existing daily-use designated requirement. The temporary UXVaHH build was launched for live testing; the previous temporary build, original DerivedData bundle and Applications copy remain untouched. Actual screenshot content and panel responsiveness remain user-verification items, not established by compilation. No permission prompts were accepted automatically and no input or iCloud settings changed.
+
+## 2026-09-13: Correct capture ABI; live preview verification pending
+
+The installed SDK's CGWindow.h declares CGWindowListCreateImage with four arguments (CGRect, list options, window ID, image options). PrivateWindowCapture incorrectly cast that symbol to a three-argument function taking a CFArray. Corrected the ABI, used explicit single-window options, and adopted retained ownership for the Create result. Removed fallback symbol guesses with unverified signatures. Capture now uses the window's global top-left bounds, with display-relative flipped coordinates only for compositing; composites traverse back-to-front.
+
+Swift syntax validation ran after each edit. The first build caught an unavailable `.default` option spelling; it was replaced with an empty option set and the full isolated Xcode build then passed. Strict signature verification passed against the prior daily-use app's designated requirement. Launched the isolated build from `YabaiSpaces-build.a3GVNa` after gracefully stopping the prior process. Original DerivedData and Applications bundles remain unchanged for rollback. No input or iCloud settings changed.
+
+This fixes a verified ABI defect, not yet a verified end-to-end rendering failure. Missing outlines may have another cause; yabai currently returns window geometry and USER is set in the app environment. Visual capture/outline validation is pending. Do not promote this temporary build to daily-use installation until verified.
+
+## 2026-09-12: Stable daily-use application staged
+
+After the user confirmed the panel worked again, copied the verified signed DerivedData app to the previously absent `/Applications/YabaiSpaces.app` and registered that exact bundle with Launch Services. No rebuild, process restart, login-item change, or input configuration change occurred in this installation step. Recursive file comparison and strict signature verification passed; designated requirements match. The running process remains the working DerivedData instance. Launch from Applications still needs functional verification.
+
+The earlier panel failure followed another task launching the repository's March app with identifier `de.arsbrevis.YabaiIndicator`; the working app uses `com.carcot.YabaiSpaces`. Preserve the old bundle for recovery but do not use it as the daily launcher. Rendering errors remain unresolved and must not be attributed solely to this launch mismatch.
+
+Verified SIP enabled, yabai animation duration zero, and active service labels `com.koekeishiya.yabai` and `com.jackielii.skhd`. The inactive `com.asmvik.yabai` plist is preserved. Next: verify stable launch, diagnose remaining previews, then migrate semantic panel dispatch without disturbing MRU timing, previous-Space behavior, Caps or Tab. Documentation whitespace validation passed. Rollback is to continue launching the untouched DerivedData bundle; no automatic deployment was added.
+
+## 2026-09-12: Scope correction, terminal trace, and safe development launcher
+
+Final verification: ran the installed run.sh --build-only against the real Xcode project. The isolated build succeeded, passed strict signing verification, and separately satisfied the previous daily-use app's designated requirement. The running app PID/path and both active skhd/Karabiner configs were byte-for-byte unchanged across the build. Generated Python test bytecode was moved out of the repo. SIP remained enabled, yabai animation duration was 0, and skhd reported an active event tap with no skhd grabber running.
+
+User confirmed resizing features are unused. The unlinked, task-created WindowGeometryCore package was moved outside the repo to task work/scope-reset/parked-WindowGeometryCore, compared against its known copy, and its nineteen tests passed there. Earlier geometry-backend migration next steps are superseded. Preserve useful panel, window/Space navigation, and existing timing; do not recreate every historical binding. HyprMac-inspired enhancements are future optional work.
+
+Read the selected Karabiner profile and local Ghostty/Emacs/Kitty settings. Tab emits left Control when held despite its Super description. Ghostty sets left Option as Alt, and the checked Ghostty and Emacs source configs contain no Control-to-Super/Meta reassignment. This is a source audit, not proof about every runtime application or terminal escape sequence. The ~/.config/emacs symlink points to missing /Users/carl/.emacs.d; ~/.emacs.d exists separately. It was not repaired automatically because selecting a startup configuration could change unrelated behavior. Caps application-list discrepancies are also left unchanged. No input mappings were removed.
+
+Replaced run.sh's force-kill-before-build and hardcoded launch path with isolated temporary signed builds. Default is now build-only; explicit --launch refuses while an existing app runs and rechecks after building. Build/signature failures stop execution, and the working app is never replaced. Documentation is in docs/SAFE_DEVELOPMENT.md. Seven mocked tests in test_run.py passed after shell/Python syntax checks, including failures and duplicate-app checks. These tests do not prove live input behavior or signing continuity. Existing app-source and Serena changes are preserved. No commits were made.
+
+The current right-Shift route is user-verified. Karabiner remains temporary, with eventual skhd replacement contingent on reliability. Rollback assets for the launcher are in task work/safe-run/run.before.sh; the parked geometry directory can be restored without any app rebuild.
+
+## 2026-09-12: Right-Shift physically verified; geometry execution contract tested
+
+User confirmed all three right-Shift behaviors work: opening the panel, confirming while open, and ordinary Shift-held typing. The temporary Karabiner/skhd/YabaiSpaces path is now physically verified. Keep the user's eventual preference for skhd replacing Karabiner contingent on reliable tap handling and preserved mappings.
+
+Added a main-actor GeometryExecutor and backend protocol to the isolated WindowGeometryCore package. Commands are validated before querying; a single target is passed to a guarded apply, followed by same-ID readback. Results distinguish stale, missing, rejected, adjusted, failed, unverified, and verified outcomes. No implicit retry or focus change is performed. Backend apply errors may involve partial changes; the contract explicitly forbids assuming errors imply no mutation. Cross-process races cannot be completely eliminated.
+
+All nineteen package tests passed, including eight new fake-backend tests for command rejection, absent/ineligible targets, stale targets, same-ID readback, application size constraints, invalid/failed readback, backend errors, and one-point rounding. Swift parsing/type checks ran immediately after source edits. This is still isolated: the real macOS backend and controlled-window tests remain to be implemented. No app rebuild/restart or live shortcut/config changes were made in this stage.
+
+Rollback: remove GeometryExecutor.swift and GeometryExecutorTests.swift and their README/log additions. Existing user changes and working input remain untouched.
+
+## 2026-09-12: Temporary right-Shift route deployed after explicit approval
+
+The user accepted the temporary Karabiner-to-skhd implementation while retaining the longer-term preference to replace Karabiner with skhd if reliable. This supersedes the blocked-deployment status below. The previously tested app was backed up, gracefully restarted, replaced with the signed build, and verified against its previous designated requirement. skhd loaded the F18-to-Hyper-F18 forward with no new logged parser errors and reported its event tap active. The added Karabiner rule was installed and JSON validation passed. All original mappings are preserved; no skhd grabber was installed.
+
+Right-Shift tap now routes through Karabiner (250ms alone detection), skhd (dispatch), and the temporary YabaiSpaces Hyper-F18 confirm-or-show action. Physical tap/confirm/typing verification is awaiting the user; deployment and unit checks do not establish end-to-end input success. The eventual architecture should remove specialized key handling from YabaiSpaces and expose semantic panel actions instead. Replacing Karabiner is contingent on reliable skhd tap handling and preserving existing Caps/modifier behavior, not an immediate removal request.
+
+Rollback assets: task work/right-shift/before contains the full prior app bundle, skhdrc, and karabiner.json. Restore those together to regain the previous native YabaiSpaces right-Shift toggle. No other input service, MRU behavior, or Space-switching logic was changed by deployment.
+
+## 2026-09-12: Right-Shift panel confirmation staged, NOT deployed
+
+User requested right-Shift tap to open the panel, then act as Return while it is visible. Replaced the source's existing modifier-tap toggle binding with Hyper-F18 and a confirm-or-show action. Return and the new action share selection confirmation logic. The existing Hyper-Space toggle remains unchanged. Karabiner's staged rule emits F18 only for an unmodified right-Shift tap within 250ms; ordinary Shift combinations pass through. skhd's staged forward maps F18 to Hyper-F18, avoiding the broken low-level skhd grabber. Panel visibility is owned by YabaiSpaces, not inferred from the foreground application (the panel is nonactivating).
+
+Validation: Swift syntax checked after each edit; full signed Xcode build passed and matched the existing designated signing requirement. An isolated mock-panel executable passed closed/show, open/confirm, externally-opened-panel, and legacy-toggle checks. JSON validation and a structural comparison verified all pre-existing Karabiner rules and skhd lines remain unchanged in staging. Actual skhd parser acceptance and physical right-Shift behavior have not been verified.
+
+Deployment was rejected twice by auto-review due to live input risk. No running app or live keyboard config was changed. The skhd parse error cited by the review was from 01:51, before cleanup; neither current nor staged config contains an active .remap. Further live deployment requires resolving the review/user approval. Staged files and original source/config backups are in the task's work/right-shift directory. Source changes are present in the repository, but the running app remains the prior version. No commits were made.
+
+## 2026-09-12: Geometry command parser and planner
+
+Added an isolated 13-command allowlist and explicit window-ID frame plans to WindowGeometryCore. This keeps keyboard dispatch separate from geometry semantics without exposing arbitrary shell commands. Missing/nonstandard/minimized/native-fullscreen targets and minimum-size violations are rejected. Maximize remains a frame operation, not native fullscreen. The command parser rejects compound and oversized messages.
+
+Validation: immediate Swift type/syntax checks passed; all eleven package tests passed, including five new command-boundary tests. The first package-test attempt was blocked by the sandbox compiler-cache restriction; the authorized rerun passed. This is not yet a live socket endpoint or window adapter. Transport authentication, bounded reads, fresh target validation, coordinate conversion and application readback remain required before hotkey cutover. No running app, signing, permissions, MRU logic, or live input configuration changed.
+
+Rollback: remove GeometryCommand.swift and GeometryCommandTests.swift and revert the corresponding package README/log additions. The package remains unlinked from the running app.
+
+## 2026-09-12: Isolated geometry migration foundation
+
+Added WindowGeometryCore as a standalone Swift package, not yet linked into the app or any input handler. It calculates halves, quarters, maximized frames, and 24-division upper-left-corner adjustments. Keeping geometry pure separates window semantics from skhd dispatch and allows testing without moving real windows or disturbing MRU history.
+
+Legacy Hammerspoon characterization passed 114 assertions and identified absent-window errors and origin-dependent corner grid dimensions. The candidate uses screen-local dimensions, preserves opposite edges, and rejects invalid or collapsed geometry. Its six XCTest cases passed in staging after correcting a negative-size validation issue exposed by testing. Syntax/type checks were performed after edits. Actual app minimum sizes and physical shortcuts still need adapter-level validation before any cutover.
+
+The current signed app and live configuration were backed up separately, and a clean isolated rebuild passed the previous build's designated signing requirement. No signing private keys were exported. Existing Serena additions and the YabaiAppDelegate logging change were preserved; no live hotkeys or application wiring changed. The pre-existing run.sh force-kill/build ordering remains a documented follow-up, not something executed in this stage.
+
+Rollback: remove the unintegrated WindowGeometryCore directory and this log entry. No application rollback or permission reset is needed because the running app was not replaced.
+
 ## 2026-08-21: FAILED - Desktop Wallpaper Restoration Caused Memory Leak Regression
 
 ### Outcome

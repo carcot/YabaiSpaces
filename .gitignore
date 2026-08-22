@@ -1,3 +1,5 @@
 xcuserdata/
 .DS_Store
 YabaiSpaces.dmg
+__pycache__/
+*.py[cod]

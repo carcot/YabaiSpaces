@@ -436,6 +436,12 @@ class HotkeyManager {
         guard let delegate = delegate else { return }
 
         switch action {
+        case .confirmOrShow(let position):
+            if let panel = delegate.floatingPanel, panel.isVisible {
+                delegate.confirmPanelSelection()
+            } else {
+                execute(.show(position), modifiers: modifiers)
+            }
         case .toggle(.atMouse(let point)):
             let position = point == .zero ? NSEvent.mouseLocation : point
             if let panel = delegate.floatingPanel, panel.isVisible {
