@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VERSION="1.1.4"
+VERSION="1.1.5"
 
 # Build the app
 echo "Building YabaiSpaces..."
@@ -9,6 +9,8 @@ xcodebuild -project YabaiIndicator.xcodeproj \
     -scheme YabaiIndicator \
     -configuration Release \
     -derivedDataPath build \
+    ARCHS="arm64 x86_64" \
+    ONLY_ACTIVE_ARCH=NO \
     clean build 2>&1 | grep -E "(BUILD|error|warning)" | tail -10
 
 # Find built app

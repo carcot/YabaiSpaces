@@ -227,66 +227,12 @@ class PrivateWindowCapture {
     /// Capture all windows for a space and composite them, returning PNG Data
     func captureSpace(windows: [Window], display: Display, targetSize: CGSize) -> Data? {
         return captureQueue.sync {
-            let rect = CGRect(origin: .zero, size: targetSize)
-
-            guard let context = CGContext(
-                data: nil,
-                width: Int(targetSize.width),
-                height: Int(targetSize.height),
-                bitsPerComponent: 8,
-                bytesPerRow: 0,
-                space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
-            ) else {
+            guard let displayID = getDisplayID(for: display.index),
+                  let displayImage = CGDisplayCreateImage(displayID),
+                  let scaledImage = scaleImage(displayImage, to: targetSize) else {
                 return nil
             }
-
-            // Draw background color
-            context.clear(rect)
-            context.setFillColor(NSColor.windowBackgroundColor.cgColor)
-            context.fill(rect)
-
-            // Capture and draw desktop wallpaper (load from file, not current screen)
-            if let desktopImage = captureDesktopCG(display: display, targetSize: targetSize) {
-                context.draw(desktopImage, in: rect)
-            }
-
-            // Draw windows
-            let scale = targetSize.width / display.frame.width
-            let displayWindows = windows.filter { $0.displayIndex == (display.index + 1) }
-
-            for window in displayWindows {
-                let scaledFrame = CGRect(
-                    x: window.frame.origin.x * scale,
-                    y: window.frame.origin.y * scale,
-                    width: window.frame.size.width * scale,
-                    height: window.frame.size.height * scale
-                )
-
-                // Try to capture actual window content
-                let cgBounds = CGRect(
-                    x: window.frame.origin.x,
-                    y: display.frame.height - window.frame.origin.y - window.frame.height,
-                    width: window.frame.size.width,
-                    height: window.frame.size.height
-                )
-
-                if let cgImage = captureWindow(windowID: Int(window.id), bounds: cgBounds, size: scaledFrame.size) {
-                    context.draw(cgImage, in: scaledFrame)
-                } else {
-                    // Fallback: white rectangle with black border
-                    context.setFillColor(NSColor.white.cgColor)
-                    context.fill(scaledFrame)
-                    context.setStrokeColor(NSColor.black.cgColor)
-                    context.stroke(scaledFrame)
-                }
-            }
-
-            if let finalCGImage = context.makeImage() {
-                return cgImageToPNG(finalCGImage)
-            }
-
-            return nil
+            return cgImageToPNG(scaledImage)
         }
     }
 }

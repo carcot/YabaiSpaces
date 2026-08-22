@@ -1,5 +1,31 @@
 # Session Log
 
+## 2026-08-21: Fix Thumbnail Capture Mach-Message Memory Growth (v1.1.5)
+
+### Problem
+Opening the spaces panel caused resident memory to jump by roughly 16.3 MB. Repeated thumbnail captures retained Mach-message-backed memory, eventually making the app unstable.
+
+### Root Cause
+`captureSpace()` composited individual windows with the private `CGWindowListCreateImage` API. On current macOS versions, those per-window captures retained WindowServer/Mach-message resources after the Swift image objects were released.
+
+### Solution
+Replaced per-window private API capture with one public `CGDisplayCreateImage` capture for the target display, then scaled and encoded that image as PNG. This restores thumbnail generation while avoiding the retained per-window capture resources.
+
+Updated `build-dmg.sh` to explicitly build both `arm64` and `x86_64`. The prior script used a Universal filename while allowing Xcode to produce only the active architecture.
+
+### Verification
+- `swiftc -parse YabaiIndicator/PrivateWindowCapture.swift` passed.
+- A clean build and all 6 Xcode tests passed.
+- The correctly signed runtime produced an 8,829-byte PNG for space 9.
+- Resident memory was stable across a panel open: 102,784 KB before and 102,656 KB after.
+- Runtime signature used bundle identifier `com.carcot.YabaiSpaces` and Team ID `7CJ3BM3AGT`.
+- The 1.1.5 Release build succeeded and the DMG mounted read-only with checksum verification.
+- The packaged app reports version `1.1.5` and contains both `x86_64` and `arm64` executable slices.
+- DMG SHA-256: `840862db7c5b9ab1a20c43eb0b086e37260e44faf7443d2f24b497237fefba32`.
+- Strict signature trust validation reports `CSSMERR_TP_NOT_TRUSTED` for the local signing certificate chain; the embedded signature metadata still reports the expected bundle ID and Team ID.
+
+See `CURRENT_MEMORY_LEAK_STATE.md` for the current diagnosis and release state.
+
 ## Future Work
 
 This section consolidates all incomplete work and potential future improvements from across the project.
