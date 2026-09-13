@@ -1,5 +1,9 @@
 # Semantic panel commands
 
+## Native sender
+
+The live skhd binding now calls the YS executable directly; Python is no longer in that route. See NATIVE_COMMANDS.md for invocation, the direct YabaiSpaces symlink, exit codes, validation and rollback. The old helper and deployment entries below are historical; the five wire commands are unchanged.
+
 ## Current installation
 
 Merged main build 4kQMoP is now installed after the controlled test described in SESSION_LOG.md and WORKING_BASELINE.md. The command protocol and physical F18 binding below are unchanged. The earlier VdlD77 confirmation remains a historical user test, not a claim that every physical input or thumbnail was retested after the merge.

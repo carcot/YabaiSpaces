@@ -11,6 +11,16 @@ import SwiftUI
 var gAppDelegate: YabaiAppDelegate!
 
 @main
+enum YabaiEntryPoint {
+    @MainActor
+    static func main() {
+        if let status = PanelCommandClient.run(arguments: Array(CommandLine.arguments.dropFirst())) {
+            exit(status)
+        }
+        YabaiIndicatorApp.main()
+    }
+}
+
 struct YabaiIndicatorApp: App {
     @NSApplicationDelegateAdaptor(YabaiAppDelegate.self) var appDelegate
 

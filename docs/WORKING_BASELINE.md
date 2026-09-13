@@ -1,5 +1,9 @@
 # User-confirmed working baseline — September 13, 2026
 
+## Native command deployment
+
+Build aJEclL is now installed to provide native panel commands. This does not claim new user confirmation while the user is away. Both the previous merged-main app and new app are backed up in `~/Library/Application Support/YabaiSpaces/Backups/native-cli-20260913.vYncb5/`; that directory also holds the previous skhdrc. Native commands and skhd reload passed; physical-key and visual checks remain pending. See NATIVE_COMMANDS.md for exact recovery and test details. The earlier confirmed baseline copies below remain unchanged.
+
 ## Main installed after controlled test
 
 Main source dcc537f2, signed build 4kQMoP, is now installed at `/Applications/YabaiSpaces.app` (PID 44764 at verification). The controlled test exercised semantic commands and a captured screenshot showed the panel, centered pointer, populated current-Space thumbnail and outline fallbacks for uncached Spaces. The screenshot is not a full multi-Space rendering or physical-input regression test. Verified byte-identical signed recovery copies of the installed app and previous app are at `~/Library/Application Support/YabaiSpaces/Backups/main-installed-20260913.YptHIB/YabaiSpaces.app` and `previous-YabaiSpaces.app`. The previous independently confirmed VdlD77 baseline also remains at `~/Library/Application Support/YabaiSpaces/Backups/pre-main-test-20260913.ldsJgA/YabaiSpaces.app`. No TCC resets or input configuration edits occurred. These facts supersede the earlier installation state below.

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B36F521CE494465393A4B1D1 /* PanelCommandClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B36F521CE494465393A4B1D2 /* PanelCommandClient.swift */; };
 		50HKMGR022779500000E8F192 /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50HKMGR012779500000E8F192 /* HotkeyManager.swift */; };
 		50PMANAGER022779500000E8F192 /* PanelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50PMANAGER012779500000E8F192 /* PanelManager.swift */; };
 		50PANEL022779500000E8F192 /* PanelHotkey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50PANEL012779500000E8F192 /* PanelHotkey.swift */; };
@@ -57,6 +58,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		B36F521CE494465393A4B1D2 /* PanelCommandClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelCommandClient.swift; sourceTree = "<group>"; };
 		500F41352780826500C6BC9B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		50HKMGR012779500000E8F192 /* HotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManager.swift; sourceTree = "<group>"; };
 		50PANEL012779500000E8F192 /* PanelHotkey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelHotkey.swift; sourceTree = "<group>"; };
@@ -162,6 +164,7 @@
 				5051A46A2780DC9B00614C85 /* defaults.plist */,
 				506120962779231000E8F192 /* Info.plist */,
 				5061206B2779212000E8F192 /* YabaiIndicatorApp.swift */,
+				B36F521CE494465393A4B1D2 /* PanelCommandClient.swift */,
 				5061206D2779212000E8F192 /* ContentView.swift */,
 				50DF24C6277BD18700DF1906 /* ImageGenerator.swift */,
 				50PL00012779210000E8F192 /* PanelLayout.swift */,
@@ -398,6 +401,7 @@
 				500F41362780826500C6BC9B /* SettingsView.swift in Sources */,
 				5061206E2779212000E8F192 /* ContentView.swift in Sources */,
 				5061206C2779212000E8F192 /* YabaiIndicatorApp.swift in Sources */,
+				B36F521CE494465393A4B1D1 /* PanelCommandClient.swift in Sources */,
 				5086FE842783026C00E51F61 /* ButtonStyle.swift in Sources */,
 					A99146BA8BC740C692ACAA1D /* ButtonImageCache.swift in Sources */,
 				5051A4692780C02700614C85 /* YabaiClient.swift in Sources */,

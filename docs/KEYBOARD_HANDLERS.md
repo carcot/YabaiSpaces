@@ -1,10 +1,10 @@
 # Keyboard handler audit — September 13, 2026
 
-Audited main dcc537f2 without removing handlers or modifying live bindings.
+Audited main dcc537f2 without removing handlers. Subsequently, the F18 sender changed from ysctl.py to YS's native command mode; see NATIVE_COMMANDS.md. The audit's keyboard ownership conclusions remain unchanged.
 
 ## Active paths
 
-- Karabiner recognizes a right-Shift tap and emits F18. skhd sends `panel activate-selected-or-show` through ysctl. YS owns visibility and selection.
+- Karabiner recognizes a right-Shift tap and emits F18. skhd invokes the YS executable with `panel activate-selected-or-show`. Its command process sends to the existing GUI instance, which owns visibility and selection.
 - YS registers two immediate Carbon hotkeys: Hyper-Space (keycode 49, toggle) and Hyper-F18 (keycode 79, activate-selected-or-show compatibility behavior). Preserve Hyper-Space while BetterTouchTool still uses the existing gesture route. Hyper-F18 is no longer needed by the current skhd F18 rule, but other callers have not been exhaustively inventoried.
 - PanelManager installs local event monitors while the panel is open. Arrow/Return/Space/Escape navigation calls the delegate's handleKeyEvent; mouse, gesture and global-event monitors support dismissal. These are panel interaction semantics, not the old right-Shift tap detector, and must not be removed indiscriminately.
 

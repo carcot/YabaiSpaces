@@ -1,5 +1,7 @@
 # Safe local builds
 
+Native command mode is installed in build aJEclL; see NATIVE_COMMANDS.md for current validation and rollback. Executing the binary with `panel ...` now sends to an already-running instance and exits; no arguments still starts the GUI. Do not pass these arguments to older app builds, which may ignore them and launch another GUI.
+
 ## Latest deployment
 
 After the controlled live test, merged main build 4kQMoP was installed at `/Applications/YabaiSpaces.app`. Both it and the prior VdlD77 app have verified recovery copies; see WORKING_BASELINE.md. The earlier publication notes below predate that installation. run.sh still never deploys automatically. The keyboard-handler audit in KEYBOARD_HANDLERS.md made no source or input changes.
