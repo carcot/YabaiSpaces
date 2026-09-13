@@ -20,6 +20,17 @@ Customizable panel layout and display options
 
 </div>
 
+## Native panel commands (current source builds)
+
+Run the application executable directly to send a command to the already-running app without starting another GUI:
+
+```sh
+/Applications/YabaiSpaces.app/Contents/MacOS/YabaiIndicator panel toggle
+/Applications/YabaiSpaces.app/Contents/MacOS/YabaiIndicator panel activate-selected-or-show
+```
+
+No arguments starts the normal app. Native command mode removes the Python helper from the keyboard-dispatch route; older release DMGs may not support it. See [native command documentation](docs/NATIVE_COMMANDS.md) for exit codes, automation setup, tests and rollback. Current physical-key verification limitations are recorded there separately from automated test results.
+
 ## Features
 
 - **Floating panel**: Shows all spaces with window previews and keyboard navigation
