@@ -1,0 +1,12 @@
+{
+  "/Users/carlcotner/dev/YabaiIndicator/YabaiIndicator/Models/SpacesModel.swift" : {
+    "abi-baseline-json" : "/Users/carlcotner/dev/YabaiIndicator/build/Build/Intermediates.noindex/YabaiIndicator.build/Release/YabaiIndicator.build/Objects-normal/arm64/YabaiIndicator.abi.json",
+    "const-values" : "/Users/carlcotner/dev/YabaiIndicator/build/Build/Intermediates.noindex/YabaiIndicator.build/Release/YabaiIndicator.build/Objects-normal/arm64/YabaiIndicator-primary.swiftconstvalues",
+    "dependencies" : "/Users/carlcotner/dev/YabaiIndicator/build/Build/Intermediates.noindex/YabaiIndicator.build/Release/YabaiIndicator.build/Objects-normal/arm64/YabaiIndicator-primary.d",
+    "diagnostics" : "/Users/carlcotner/dev/YabaiIndicator/build/Build/Intermediates.noindex/YabaiIndicator.build/Release/YabaiIndicator.build/Objects-normal/arm64/YabaiIndicator-primary.dia",
+    "objc-header" : "/Users/carlcotner/dev/YabaiIndicator/build/Build/Intermediates.noindex/YabaiIndicator.build/Release/YabaiIndicator.build/Objects-normal/arm64/YabaiIndicator-Swift.h",
+    "swiftdoc" : "/Users/carlcotner/dev/YabaiIndicator/build/Build/Intermediates.noindex/YabaiIndicator.build/Release/YabaiIndicator.build/Objects-normal/arm64/YabaiIndicator.swiftdoc",
+    "swiftmodule" : "/Users/carlcotner/dev/YabaiIndicator/build/Build/Intermediates.noindex/YabaiIndicator.build/Release/YabaiIndicator.build/Objects-normal/arm64/YabaiIndicator.swiftmodule",
+    "swiftsourceinfo" : "/Users/carlcotner/dev/YabaiIndicator/build/Build/Intermediates.noindex/YabaiIndicator.build/Release/YabaiIndicator.build/Objects-normal/arm64/YabaiIndicator.swiftsourceinfo"
+  }
+}

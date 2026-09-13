@@ -95,6 +95,16 @@ When the panel is visible (`Cmd+Option+Ctrl+Shift+Space` or Right Shift tap):
 - **Right-click**: Open context menu
 - **Scroll/swipe**: Close panel
 
+## Future Work
+
+- **Custom hotkey support**: Currently fixed to `Cmd+Option+Ctrl+Shift+Space` or Right Shift tap. User-configurable hotkeys would allow personal preference and conflict avoidance.
+
+- **Visual grid configuration**: The current settings panel uses numeric inputs for grid dimensions. A visual preview with drag-to-resize grid cells would make layout customization more intuitive.
+
+- **Full-screen app handling**: Full-screen apps currently occupy an entire space but aren't visually distinguished. Any ideas?
+
+- **Multi-monitor refinements**: Spaces currently show across displays, but per-display grid layouts or display-specific panels could improve multi-monitor workflows. (I have no way of testing multiple displays.)
+
 ## Comparison to Similar Applications
 
 [YabaiIndicator](https://github.com/xiamaz/YabaiIndicator) by Max Zhao - Excellent app with reliable space detection, Yabai integration, and space switching. It serves as the foundation for this project. Huge thanks to Max for his great idea and creating such a solid base for this project.

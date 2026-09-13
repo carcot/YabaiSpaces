@@ -1,90 +1,38 @@
 # Current Memory Leak State
 
-**Date**: August 21, 2026  
-**Status**: 🚨 **ACTIVE MEMORY LEAK** - Desktop wallpapers restoration caused regression
+## Release status
 
-## Current Situation
+The thumbnail-capture memory regression is fixed for YabaiSpaces 1.1.5. Space thumbnails are generated from a single public display capture instead of private per-window WindowServer captures.
 
-### Memory Leak Confirmed
-**Memory Usage Pattern:**
-```
-Startup: 75 MB
-Panel opens: 81 → 91 → 97 → 103 → 108 → 114 → 119 → 120 → 126 MB
-Total increase: 51 MB over multiple panel opens
-```
+## Root cause
 
-**Leaks Tool Output:**
-```
-Process 17891: 84 leaks for 14544 total leaked bytes
-ROOT LEAK: <CGImage 0xca4074f00> [320]
-ROOT LEAK: <CGImage 0xca4075680> [320]
-```
+The previous `captureSpace()` implementation called the private `CGWindowListCreateImage` API for every visible window and composited the results. Each panel open retained about 16.3 MB of Mach-message-backed memory even after the Swift and Core Graphics objects went out of scope. The retained memory was below the application object layer and could not be resolved by adding local autorelease pools or clearing image caches.
 
-### What We Did Wrong
-1. **Assumed direct CGImage drawing was safe**: Used `context.draw(wallpaperCG, in: rect)` thinking it would avoid the NSImage leaks
-2. **Ignored the original fix**: Commit `ae254c4` removed wallpapers specifically because of CGImage leaks
-3. **Insufficient testing**: Didn't run `leaks` tool during development, only checked basic functionality
+## Fix
 
-### What Actually Happened
-- **Commit `ce328c8`**: Had working wallpapers with NSImage drawing (caused leaks)
-- **Commit `ae254c4`**: Removed wallpapers entirely to fix leaks (gray backgrounds)
-- **Our fix**: Restored wallpapers with direct CGImage drawing (STILL LEAKS)
+`captureSpace()` now:
 
-## The Core Problem
+1. Resolves the target `CGDirectDisplayID`.
+2. Captures the display once with the public `CGDisplayCreateImage` API.
+3. Scales the display image to the thumbnail size.
+4. Encodes the scaled image as PNG data.
 
-**Both approaches leak:**
-```swift
-// Original approach - leaks
-let wallpaper = NSImage(cgImage: wallpaperCG, size: size)
-wallpaper.draw(in: rect)  // CGImage leaks
+This is the same display-capture technique proven in commit `1eef6ce`. The old private capture helpers remain available to other code, but the space-thumbnail path no longer invokes them.
 
-// Our "fix" - still leaks  
-context.draw(wallpaperCG, in: rect)  // CGImage leaks
-```
+## Verification
 
-The fundamental issue is that **any CGImage drawing in this context creates dependency leaks**, regardless of the drawing method.
+- Swift parsing passed after the implementation change.
+- A clean build completed successfully.
+- All 6 Xcode tests passed.
+- A correctly signed runtime capture generated an 8,829-byte PNG for space 9.
+- Resident memory was 102,784 KB before opening the panel and 102,656 KB afterward, with no capture-related increase.
+- The tested application used bundle identifier `com.carcot.YabaiSpaces` and Team ID `7CJ3BM3AGT`.
+- The 1.1.5 DMG mounted read-only and passed image checksum verification.
+- The packaged executable contains both `x86_64` and `arm64` slices and reports version `1.1.5`.
+- DMG SHA-256: `840862db7c5b9ab1a20c43eb0b086e37260e44faf7443d2f24b497237fefba32`.
 
-## Current State of Files
+The app has an embedded hardened-runtime signature with the expected bundle ID and Team ID. Strict trust evaluation on the build host reports `CSSMERR_TP_NOT_TRUSTED`, so the local signing certificate chain is not currently suitable for a trusted public distribution without renewal or notarization.
 
-### Wallpaper Loading Fix (COMMITTED BUT BROKEN)
-- **Commit**: `4940905` "fix: restore desktop wallpapers in hybrid previews (memory-safe)"
-- **Files modified**:
-  - `PrivateWindowCapture.swift` - Multi-screen wallpaper loading
-  - `ImageGenerator.swift` - Direct CGImage drawing (LEAKING)
-  - `ButtonImageCache.swift` - Separate wallpaper cache
-  - `YabaiClient.swift` - Fixed queryWindows logic
-  - `WALLPAPER_LOADING_FIX.md` - Incorrect documentation
-  - `SESSION_LOG.md` - Incorrect session history
+## Known tradeoff
 
-### Memory Logging (WORKING)
-- **Commit**: `0de1e29` "fix: add safety checks and improvements"
-- **Status**: ✅ Working correctly, detected the leak
-- **Output**: Shows 51 MB memory increase over panel opens
-- **Method**: Uses `NSLog` (not unified logging)
-
-## Technical Analysis
-
-### Why Direct CGImage Drawing Leaks
-Even though we used `context.draw(cgImage, in: rect)` instead of NSImage drawing, the CGImage dependencies are still being retained somewhere in the rendering pipeline.
-
-### What Commit ae254c4 Actually Fixed
-Looking at the original fix:
-```swift
-// BEFORE (leaking):
-if let wallpaperCG = gPrivateWindowCapture.captureDesktopCG(...) {
-    let wallpaper = NSImage(cgImage: wallpaperCG, size: size)
-    wallpaper.draw(in: rect)
-}
-
-// AFTER (memory-safe):
-context.setFillColor(NSColor(red: 0.3, green: 0.35, blue: 0.45, alpha: 1.0).cgColor)
-context.fill(rect)
-```
-
-The solution was **removing wallpapers entirely**, not changing the drawing method.
-
-## Summary
-
-**We successfully restored wallpapers but reintroduced the exact memory leak that was fixed in commit `ae254c4`.** The direct CGImage drawing approach is not memory-safe, and we now have 84 CGImage leaks causing 51 MB of memory growth.
-
-The logging system is working perfectly and detected the leak immediately, but the core wallpaper rendering approach needs to be completely reconsidered or reverted.
+The public API captures the current display as a whole. It avoids the WindowServer resource retention of private per-window capture, but it does not independently reconstruct the contents of a non-visible space. Cached thumbnails remain the mechanism for representing spaces that are not currently displayed.

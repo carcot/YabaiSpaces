@@ -2,6 +2,8 @@
 
 ## Current state — September 13
 
+The source publication merges the confirmed desktop/input changes with existing main release history. It retains upstream query/error handling and has 20 focused tests, including merge regression guards. The merged source is built separately and is not installed automatically; VdlD77 remains the user-tested running app. A successful build does not substitute for visual verification before any future deployment. Existing release DMGs describe their original tags, not the newly merged source.
+
 The signed VdlD77 build is installed at `/Applications/YabaiSpaces.app`. The user confirmed both skhd right-Shift dispatch and restored Desktop icons. `run.sh` remains build-only by default; it does not deploy or restart the daily app. Earlier installation notes below are historical. Preserve full-display capture and semantic commands together in future builds; testing panel activation alone missed a rendering regression. See `PANEL_COMMANDS.md`, `WORKING_BASELINE.md`, and `SKHD_GRABBER_RESEARCH.md` for current behavior, recovery copies and deferred work.
 
 ## Daily-use installation: September 12, 2026

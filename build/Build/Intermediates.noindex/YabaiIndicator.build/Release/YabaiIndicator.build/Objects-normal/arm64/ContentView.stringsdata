@@ -1,0 +1,48 @@
+{
+  "source": "/Users/carlcotner/dev/YabaiIndicator/YabaiIndicator/ContentView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 370
+        }
+      },
+      {
+        "comment": "",
+        "key": "About",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 454
+        }
+      },
+      {
+        "comment": "",
+        "key": "Preferences...",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 458
+        }
+      },
+      {
+        "comment": "",
+        "key": "Toggle Button Style",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 462
+        }
+      },
+      {
+        "comment": "",
+        "key": "Quit YabaiIndicator",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 473
+        }
+      }
+    ]
+  },
+  "version": 1
+}

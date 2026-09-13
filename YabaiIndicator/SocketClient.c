@@ -71,22 +71,32 @@ int send_message(int argc, char** argv, char** response) {
     }
     *temp++ = '\0';
     
+    // Set socket timeouts
+    struct timeval timeout;
+    timeout.tv_sec = 2;
+    timeout.tv_usec = 0;
+    
     int sockfd;
     sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sockfd == -1) {
         snprintf(*response, BUFSIZ, "yabai-msg: failed to open socket..\n");
         return EXIT_FAILURE;
     }
-
-    // Set socket timeouts to prevent hangs
-    struct timeval timeout;
-    timeout.tv_sec = 2;
-    timeout.tv_usec = 0;
-    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-
+    
+    // Set receive timeout
+    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) == -1) {
+        snprintf(*response, BUFSIZ, "yabai-msg: failed to set socket timeout..\n");
+        socket_close(sockfd);
+        return EXIT_FAILURE;
+    }
+    
+    // Set send timeout  
     timeout.tv_sec = 5;
-    timeout.tv_usec = 0;
-    setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+    if (setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) == -1) {
+        snprintf(*response, BUFSIZ, "yabai-msg: failed to set send timeout..\n");
+        socket_close(sockfd);
+        return EXIT_FAILURE;
+    }
 
     char socket_file[MAXLEN];
     snprintf(socket_file, sizeof(socket_file), SOCKET_PATH_FMT, user);

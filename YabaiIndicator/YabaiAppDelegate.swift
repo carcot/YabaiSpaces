@@ -108,12 +108,12 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     func onSpaceChanged(_ notification: Notification) {
         onSpaceRefresh()
     }
-    
+
     @objc
     func onDisplayChanged(_ notification: Notification) {
         onSpaceRefresh()
     }
-    
+
     func refreshData() {
         // log("Refreshing")
         receiverQueue.async {
@@ -121,7 +121,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             self.onWindowRefresh()
         }
     }
-    
+
     func onSpaceRefresh() {
         let displays = gNativeClient.queryDisplays()
         let spaceElems = gNativeClient.querySpaces()
@@ -141,32 +141,50 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         let display = displays[space.display - 1]
 
         // CRITICAL: Query windows synchronously BEFORE space switch
-        let windows = gYabaiClient.queryWindows()
-        let spaceWindows = windows.filter { $0.spaceIndex == space.yabaiIndex }
+        do {
+            let windows = try gYabaiClient.queryWindows()
+            let spaceWindows = windows.filter { $0.spaceIndex == space.yabaiIndex }
 
-        // Calculate thumbnail size proportional to display aspect ratio
-        let baseHeight: CGFloat = 20 * panelLayout.scale
-        let aspect = display.frame.width / display.frame.height
-        let targetSize = CGSize(width: baseHeight * aspect, height: baseHeight)
+            // Calculate thumbnail size proportional to display aspect ratio
+            let baseHeight: CGFloat = 20 * panelLayout.scale
+            let aspect = display.frame.width / display.frame.height
+            let targetSize = CGSize(width: baseHeight * aspect, height: baseHeight)
 
-        if let data = gPrivateWindowCapture.captureSpace(
-            windows: spaceWindows,
-            display: display,
-            targetSize: targetSize
-        ) {
-            gThumbnailCache.set(spaceId: space.spaceid, data: data)
+            if let data = gPrivateWindowCapture.captureSpace(
+                windows: spaceWindows,
+                display: display,
+                targetSize: targetSize
+            ) {
+                gThumbnailCache.set(spaceId: space.spaceid, data: data)
+            }
+        } catch {
+            NSLog("[YabaiSpaces] Failed to query windows for thumbnail capture: \(error.localizedDescription)")
+            // Non-critical - continue without thumbnail
         }
     }
 
     func onWindowRefresh() {
         // Always query windows for panel (hybrid preview needs window outlines)
         // regardless of menubar button style
-        let windows = gYabaiClient.queryWindows()
-        DispatchQueue.main.async {
-            self.spaceModel.windows = windows
+        do {
+            let windows = try gYabaiClient.queryWindows()
+            DispatchQueue.main.async {
+                self.spaceModel.windows = windows
+            }
+        } catch let error as YabaiError {
+            NSLog("[YabaiSpaces] Window refresh failed: \(error.localizedDescription)")
+            // Don't update model on error - keep existing windows
+            DispatchQueue.main.async {
+                self.spaceModel.windows = []  // Clear stale data
+            }
+        } catch {
+            NSLog("[YabaiSpaces] Unexpected error in onWindowRefresh: \(error.localizedDescription)")
+            DispatchQueue.main.async {
+                self.spaceModel.windows = []
+            }
         }
     }
-    
+
     func refreshBar() {
         let showDisplaySeparator = UserDefaults.standard.bool(forKey: "showDisplaySeparator")
         let showCurrentSpaceOnly = UserDefaults.standard.bool(forKey: "showCurrentSpaceOnly")
@@ -452,7 +470,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
         // Define bindings declaratively
         let bindings: [HotkeyBinding] = [
-            // Cmd+Option+Ctrl+Shift+Space - toggle panel
             HotkeyBinding(
                 id: 1,
                 keyCode: 49,  // Space
@@ -617,7 +634,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             NSLog("[YabaiSpaces] Socket server error: \(error.localizedDescription)")
         }
     }
-    
+
     @objc
     func quit() {
         NSApp.terminate(self)
@@ -636,6 +653,32 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         alert.addButton(withTitle: "OK")
         alert.runModal()
     }
+
+    private func showErrorAlert(error: Error) {
+        let alert = NSAlert()
+        alert.messageText = "Yabai Error"
+
+        if let yabaiError = error as? YabaiError {
+            alert.informativeText = yabaiError.errorDescription ?? "Unknown error occurred"
+
+            // Check if recovery suggestion exists
+            let hasRecovery = yabaiError.recoverySuggestion != nil
+
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "OK")
+
+            if hasRecovery {
+                _ = yabaiError.recoverySuggestion // Suppress unused warning
+            }
+        } else {
+            alert.informativeText = error.localizedDescription
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "OK")
+        }
+
+        alert.runModal()
+    }
+
 
     @objc
     func openPreferences() {
@@ -682,7 +725,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         window.makeKeyAndOrderFront(nil)
         settingsWindow = window
     }
-    
+
     func createStatusItemView() -> NSView {
         let view = NSHostingView(
             rootView: ContentView().environmentObject(spaceModel)
@@ -690,7 +733,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         view.setFrameSize(NSSize(width: 0, height: statusBarHeight))
         return view
     }
-    
+
     func createMenu() -> NSMenu {
         let statusBarMenu = NSMenu()
         statusBarMenu.addItem(
@@ -710,7 +753,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             keyEquivalent: "")
         return statusBarMenu
     }
-    
+
     func registerObservers() {
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(self.onSpaceChanged(_:)), name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(self.onDisplayChanged(_:)), name: Notification.Name("NSWorkspaceActiveDisplayDidChangeNotification"), object: nil)
@@ -723,27 +766,43 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
     // Switch spaces, optionally focusing a specific window
     func switchSpace(to yabaiIndex: Int, focusWindowId: UInt64? = nil) {
-        // Perform the space switch
-        gYabaiClient.focusSpace(index: yabaiIndex)
+        do {
+            // Perform the space switch
+            try gYabaiClient.focusSpace(index: yabaiIndex)
 
-        // Hide panel after switch (don't restore cursor - we're on a new desktop)
-        panelManager?.cursorRestorationPolicy = .skip
-        hidePanel()
+            // Hide panel after switch (don't restore cursor - we're on a new desktop)
+            panelManager?.cursorRestorationPolicy = .skip
+            hidePanel()
 
-        // Update space model after switch
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            guard let self = self else { return }
+            // Update space model after switch
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                guard let self = self else { return }
 
-            // Query spaces SYNCHRONOUSLY to get updated active flags
-            let spaceElems = gNativeClient.querySpaces()
-            DispatchQueue.main.async {
-                self.spaceModel.spaces = spaceElems
+                // Query spaces SYNCHRONOUSLY to get updated active flags
+                let spaceElems = gNativeClient.querySpaces()
+                DispatchQueue.main.async {
+                    self.spaceModel.spaces = spaceElems
+                }
+
+                // Focus specific window if requested
+                if let windowId = focusWindowId {
+                    do {
+                        try gYabaiClient.focusWindow(id: windowId)
+                    } catch {
+                        NSLog("[YabaiSpaces] Failed to focus window \(windowId): \(error.localizedDescription)")
+                        // Non-critical error - space switched successfully
+                    }
+                }
             }
+        } catch let error as YabaiError {
+            NSLog("[YabaiSpaces] Failed to switch to space \(yabaiIndex): \(error.localizedDescription)")
 
-            // Focus specific window if requested
-            if let windowId = focusWindowId {
-                gYabaiClient.focusWindow(id: windowId)
+            // Show user-facing error for critical failures
+            DispatchQueue.main.async { [weak self] in
+                self?.showErrorAlert(error: error)
             }
+        } catch {
+            NSLog("[YabaiSpaces] Unexpected error switching spaces: \(error.localizedDescription)")
         }
     }
 

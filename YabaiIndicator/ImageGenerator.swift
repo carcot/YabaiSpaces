@@ -312,11 +312,11 @@ func generateHybridPreviewImage(active: Bool, visible: Bool, windows: [Window], 
 
         let context = createCGContext(size: size)
 
-        // Draw desktop wallpaper as background (direct CGImage drawing to avoid leaks)
-        if let wallpaperCG = gPrivateWindowCapture.captureDesktopCG(display: display, targetSize: size) {
-            context.draw(wallpaperCG, in: rect)
+        // Draw cached wallpaper as background
+        if let cgImage = gPrivateWindowCapture.captureDesktopCG(display: display, targetSize: size) {
+            context.draw(cgImage, in: rect)
         } else {
-            // Fallback to solid color if wallpaper load fails
+            // Fallback: solid color
             context.setFillColor(NSColor(red: 0.3, green: 0.35, blue: 0.45, alpha: 1.0).cgColor)
             context.fill(rect)
         }

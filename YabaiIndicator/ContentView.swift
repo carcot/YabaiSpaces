@@ -31,7 +31,12 @@ struct SpaceButton : View {
     
     func switchSpace() {
         if !space.active && space.yabaiIndex > 0 {
-            gYabaiClient.focusSpace(index: space.yabaiIndex)
+            do {
+                try gYabaiClient.focusSpace(index: space.yabaiIndex)
+            } catch {
+                NSLog("[YabaiSpaces] Failed to switch to space \(space.yabaiIndex): \(error.localizedDescription)")
+                // Silent failure in UI context - user can try again
+            }
         }        
     }
     
@@ -54,7 +59,12 @@ struct WindowSpaceButton : View {
 
     func switchSpace() {
         if !space.active && space.yabaiIndex > 0 {
-            gYabaiClient.focusSpace(index: space.yabaiIndex)
+            do {
+                try gYabaiClient.focusSpace(index: space.yabaiIndex)
+            } catch {
+                NSLog("[YabaiSpaces] Failed to switch to space \(space.yabaiIndex): \(error.localizedDescription)")
+                // Silent failure in UI context - user can try again
+            }
         }
     }
 
@@ -218,9 +228,9 @@ struct ThumbnailSpaceButton : View {
                         }
                 )
             } else {
-                // Safely get first display, fallback to default if displays array is empty
-                let display = displays.first ?? Display(id: 0, uuid: "fallback", index: 1, frame: .zero)
-                Image(nsImage: generateImage(active: space.active, visible: space.visible, windows: windows, display: display, scale: layout.scale))
+                // Fallback: use first available display or minimal frame for numeric style
+                let fallbackDisplay = displays.first ?? Display(id: 0, uuid: "", index: 0, frame: NSRect(x: 0, y: 0, width: 1920, height: 1080))
+                Image(nsImage: generateImage(active: space.active, visible: space.visible, windows: windows, display: fallbackDisplay, scale: layout.scale))
                     .onTapGesture { switchSpace() }
                     .frame(width: layout.imageSize.width, height: layout.imageSize.height)
             }
