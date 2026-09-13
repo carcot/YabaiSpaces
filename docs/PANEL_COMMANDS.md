@@ -1,5 +1,9 @@
 # Semantic panel commands
 
+## Current installation
+
+Merged main build 4kQMoP is now installed after the controlled test described in SESSION_LOG.md and WORKING_BASELINE.md. The command protocol and physical F18 binding below are unchanged. The earlier VdlD77 confirmation remains a historical user test, not a claim that every physical input or thumbnail was retested after the merge.
+
 ## Confirmed current state — September 13
 
 The user physically verified right-Shift opens the panel and a second tap activates the selection after skhd deployment. After restoring the historical full-display capture implementation in build VdlD77, the user also confirmed Desktop icons render again. That build is installed at `/Applications/YabaiSpaces.app`. These confirmations supersede the pending-verification statements in the earlier entries below. The same semantic commands and F18 binding remain in use.

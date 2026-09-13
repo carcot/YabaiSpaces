@@ -1,5 +1,9 @@
 # User-confirmed working baseline — September 13, 2026
 
+## Main installed after controlled test
+
+Main source dcc537f2, signed build 4kQMoP, is now installed at `/Applications/YabaiSpaces.app` (PID 44764 at verification). The controlled test exercised semantic commands and a captured screenshot showed the panel, centered pointer, populated current-Space thumbnail and outline fallbacks for uncached Spaces. The screenshot is not a full multi-Space rendering or physical-input regression test. Verified byte-identical signed recovery copies of the installed app and previous app are at `~/Library/Application Support/YabaiSpaces/Backups/main-installed-20260913.YptHIB/YabaiSpaces.app` and `previous-YabaiSpaces.app`. The previous independently confirmed VdlD77 baseline also remains at `~/Library/Application Support/YabaiSpaces/Backups/pre-main-test-20260913.ldsJgA/YabaiSpaces.app`. No TCC resets or input configuration edits occurred. These facts supersede the earlier installation state below.
+
 ## Latest confirmed installation
 
 The installed VdlD77 build combines semantic panel commands with the historical full-display capture fix. The user confirmed right-Shift dispatch and Desktop-icon thumbnails after deployment. Keep both features together. Previous semantic-command-only app: `~/Library/Application Support/YabaiSpaces/Backups/icons-20260913.zY2L1M/YabaiSpaces.app`. The earlier recovery archive below remains available. No new archive of VdlD77 has yet been created; the installed bundle and temporary build are not an independent durable backup. Capture experiments were shelved before command deployment, and the historical display-capture method was subsequently restored. The inventory below describes the earlier baseline, not the current source state.

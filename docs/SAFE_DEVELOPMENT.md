@@ -1,5 +1,9 @@
 # Safe local builds
 
+## Latest deployment
+
+After the controlled live test, merged main build 4kQMoP was installed at `/Applications/YabaiSpaces.app`. Both it and the prior VdlD77 app have verified recovery copies; see WORKING_BASELINE.md. The earlier publication notes below predate that installation. run.sh still never deploys automatically. The keyboard-handler audit in KEYBOARD_HANDLERS.md made no source or input changes.
+
 ## Current state — September 13
 
 The source publication merges the confirmed desktop/input changes with existing main release history. It retains upstream query/error handling and has 20 focused tests, including merge regression guards. The merged source is built separately and is not installed automatically; VdlD77 remains the user-tested running app. A successful build does not substitute for visual verification before any future deployment. Existing release DMGs describe their original tags, not the newly merged source.

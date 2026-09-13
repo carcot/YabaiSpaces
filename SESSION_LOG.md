@@ -1,5 +1,13 @@
 # Session Log
 
+## 2026-09-13: Main live test, stable installation and keyboard audit
+
+User requested execution of the controlled test and then continued work. Verified a fresh copy of the previously confirmed app at pre-main-test-20260913.ldsJgA, then launched merged build 4kQMoP. Semantic show/hide/activate-selected-or-show/activate-selected exchanges acknowledged; skhd remained PID 2401 with its event tap active. Initial screenshot missed the panel during concurrent user focus changes; an immediate screenshot showed the panel, centered pointer, actual current-Space content and expected outline fallbacks on uncached Spaces. Framework IOSurface errors were present in startup logs, so no claim of an error-free log or exhaustive rendering verification is made.
+
+Installed that exact signed build at /Applications/YabaiSpaces.app, stopped the temporary instance, and verified one installed instance (PID 44764) plus command acknowledgment. Byte comparison and strict signatures passed for the staged and recovery copies. Backup directory: ~/Library/Application Support/YabaiSpaces/Backups/main-installed-20260913.YptHIB/ (YabaiSpaces.app is the new build; previous-YabaiSpaces.app is the prior daily app). No binding, TCC, iCloud, MRU or previous-Space changes.
+
+Audited remaining registrations: both default global hotkeys use Carbon; ComposableHotkey's specialized tap/hold detector is dormant. Panel-local navigation/dismissal monitors remain necessary. Recorded active and dormant paths in docs/KEYBOARD_HANDLERS.md. No handler removal was performed. Documentation whitespace validation passed; source is unchanged from tested main dcc537f2. Full physical-input and multi-Space visual verification remain distinct from this audit and screenshot.
+
 ## 2026-09-13: Approved main integration
 
 The user explicitly approved resolving the conflicts, rebuilding/testing and publishing to main. Merged the documented tested checkpoint with GitHub main 682b4d8 without rewriting either history. Preserved main's throwing Yabai client and matching call-site error handling, release metadata and existing artifacts; retained the tested full-display thumbnail method, same-user semantic socket commands, Hyper-F18 compatibility and Hyper-Space toggle behavior. Kept the newer Serena configuration comments and Python bytecode exclusions.
