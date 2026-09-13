@@ -2,6 +2,8 @@
 
 ## 2026-09-13: Native application command mode replaces live Python dispatch
 
+Publication housekeeping: the Debug executable populated a previously tracked empty default.profraw during command testing. Removed that generated coverage file from tracking and ignored profraw/profdata outputs; no executable source changes were needed. The local profiling output may remain on disk, but is not a source artifact.
+
 Final verification caveat: the CLI skhd status probe changed from Input Monitoring unknown to denied, while the same daemon still reported an active event tap. Source inspection shows that permission query runs in the status subprocess, not directly in daemon PID 2401. No fresh daemon-revocation diagnostic was found. Physical input remains unverified; no further synthetic events, TCC reset or permission grants were attempted. The native hide command still succeeds. All 31 tests passed again. This caveat qualifies the earlier healthy-status statements below.
 
 User requested YS itself accept panel commands without normal GUI startup and authorized autonomous implementation. Added YabaiEntryPoint to dispatch arguments before constructing the SwiftUI App/delegate, and PanelCommandClient with bounded same-user Unix-socket transport. No-argument GUI behavior and all panel messages are preserved. Native help, invalid arguments and socket errors exit rather than create another GUI. The helper does not auto-launch or retry. Added the client to the Xcode target and 11 native tests; all 31 focused tests passed alongside immediate Swift parsing/type checking, Python compilation/import, project plist validation and full signed build aJEclL.

@@ -4,6 +4,8 @@ xcuserdata/
 YabaiSpaces.dmg
 __pycache__/
 *.py[cod]
+*.profraw
+*.profdata
 
 # Xcode build artifacts
 build/
