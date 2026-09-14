@@ -8,6 +8,7 @@
 import AppKit
 
 enum SwitchCommand: String, CaseIterable {
+    case nextRecentSpace = "space next-recent"
     case nextWindowInSpace = "window next-in-space"
     case previousWindowInSpace = "window previous-in-space"
     case nextWindowAcrossSpaces = "window next-across-spaces"

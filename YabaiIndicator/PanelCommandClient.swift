@@ -10,7 +10,7 @@ enum PanelCommandClient {
     static func run(arguments: [String], socketPath: String = "/tmp/yabai-indicator.socket", timeout: TimeInterval = 3) -> Int32? {
         if arguments.isEmpty { return nil }
         if arguments.count == 1 && arguments[0].hasPrefix("-psn_") { return nil }
-        let usage = "Usage: YabaiSpaces panel {show|hide|toggle|activate-selected|activate-selected-or-show}\n       YabaiSpaces {app|window} {next-in-space|previous-in-space|next-across-spaces|previous-across-spaces}\n"
+        let usage = "Usage: YabaiSpaces panel {show|hide|toggle|activate-selected|activate-selected-or-show}\n       YabaiSpaces {app|window} {next-in-space|previous-in-space|next-across-spaces|previous-across-spaces}\n       YabaiSpaces space next-recent\n"
         if arguments == ["--help"] || arguments == ["-h"] {
             FileHandle.standardOutput.write(Data(usage.utf8))
             return 0

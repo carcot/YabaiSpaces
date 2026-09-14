@@ -1,5 +1,11 @@
 # Session Log
 
+## 2026-09-13: Shortcut migration prepared; live handoff awaits Hammerspoon IPC
+
+Inspected current skhd, Karabiner and loaded Hammerspoon source before changing live configuration. The direct shortcuts are Option-F19 for window cycling and Command-L/period for recent-Space navigation. Hammerspoon normalizes the apparent right-side modifier strings to unsided modifiers; preserve that actual behavior. Added a separate space next-recent semantic command reproducing the existing other-Space traversal rather than misbinding those shortcuts to app/window next-across-spaces. The prefix/modal bindings remain out of this direct-shortcut migration.
+
+Added staged skhd rules and a selectively disabling Lua handoff with syntax/loading tests. Immediate Swift syntax/type checks, Python compilation/import and separate signed build ree466 succeeded. No installed app, live skhd config, Hammerspoon config, permission setting or input service was changed. Hammerspoon IPC is not loaded, so requested that the user run require('hs.ipc') in its Console; this allows releasing only migrated handlers without restarting Hammerspoon or resetting its history. See docs/SHORTCUT_MIGRATION.md for exact mapping, validation boundaries and activation order. Migration is not yet active.
+
 ## 2026-09-13: Native application/window switching added
 
 Final verification: all 34 focused tests passed. Live application/window commands switched within Space 11 (135 → 108) and across Spaces 7 → 12 (1060 → 1071), verified through yabai focus queries, with original window 1060 restored. Application-mode tests verified different PIDs. SIP remains enabled; window_animation_duration remains 0.000000. Documentation whitespace checks passed. No physical shortcuts were remapped, and no exhaustive rendering/physical-key verification is claimed for this build.

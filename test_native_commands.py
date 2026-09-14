@@ -119,6 +119,7 @@ import Darwin
         self.exchange([b"ok ", b"queued", b"\n"], 0)
 
     def test_switch_commands(self):
+        self.exchange([b"ok queued\n"], 0, "next-recent", unit="space")
         for unit in ["app", "window"]:
             for action in ["next-in-space", "previous-in-space", "next-across-spaces", "previous-across-spaces"]:
                 with self.subTest(unit=unit, action=action):

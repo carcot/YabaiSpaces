@@ -54,7 +54,7 @@ struct WindowSwitching {
     mutating func target(_ command: SwitchCommand, windows: [NavigationWindow], currentSpace: Int,
                          now: TimeInterval) -> NavigationWindow? {
         observe(windows, now: now)
-        let requestedScope = "\(command.applications)-\(command.acrossSpaces ? 0 : currentSpace)"
+        let requestedScope = command == .nextRecentSpace ? "recent-spaces" : "\(command.applications)-\(command.acrossSpaces ? 0 : currentSpace)"
         if scope != requestedScope {
             promote(lastFocused)
             cycle = history
@@ -62,6 +62,14 @@ struct WindowSwitching {
         }
         deadline = now + 2
         let byID = Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0) })
+        if command == .nextRecentSpace {
+            let ordered = cycle.compactMap { byID[$0] }
+            if let current = ordered.firstIndex(where: { $0.space == currentSpace }),
+               let target = ordered.dropFirst(current + 1).first(where: { $0.space != currentSpace }) {
+                return target
+            }
+            return ordered.first(where: { $0.space != currentSpace })
+        }
         var candidates = cycle.compactMap { byID[$0] }.filter { command.acrossSpaces || $0.space == currentSpace }
         let focused = windows.first(where: \.focused)
         if command.applications {

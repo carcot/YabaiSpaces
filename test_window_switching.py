@@ -108,6 +108,10 @@ extension WindowSwitchController {
             }
         }
         var state = WindowSwitching()
+        precondition(state.target(.nextRecentSpace, windows: windows(), currentSpace: 1, now: 0)?.id == 4)
+        precondition(state.target(.nextRecentSpace, windows: windows(4), currentSpace: 2, now: 1)?.id == 1)
+        precondition(state.target(.nextRecentSpace, windows: windows().filter { $0.space == 1 }, currentSpace: 1, now: 1.5) == nil)
+        state = WindowSwitching()
         precondition(state.target(.nextWindowInSpace, windows: windows(), currentSpace: 1, now: 0)?.id == 2)
         state.observe(windows(2), now: 0.1)
         precondition(state.target(.nextWindowInSpace, windows: windows(2), currentSpace: 1, now: 1)?.id == 3)
