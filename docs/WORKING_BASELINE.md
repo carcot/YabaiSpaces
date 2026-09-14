@@ -1,5 +1,9 @@
 # User-confirmed working baseline — September 13, 2026
 
+## September 14 shortcut deployment
+
+Signed build ree466 is now installed with the active three-shortcut handoff described in [SHORTCUT_MIGRATION.md](SHORTCUT_MIGRATION.md). Live skhd chord tests passed for within-Space window cycling and recent-Space switching. Hammerspoon was not restarted; its remaining hotkeys are intact. Recovery app/config copies are in `~/Library/Application Support/YabaiSpaces/Backups/shortcut-handoff-20260914.K1EhLx/`. This supersedes installation descriptions below, not earlier user-reported visual confirmations.
+
 ## Current switching deployment
 
 Signed build De3uLb is installed with native application/window switching; it supersedes the installation descriptions below. The prior native-panel build's physical right-Shift route was user-confirmed before this deployment. The new build passed 34 automated tests and live focus-query checks for application/window switching both within Space 11 and from Space 7 to Space 12. Original window 1060 was restored. No input configuration or capture code changed, but this is not a new exhaustive visual/physical-key confirmation. Recovery copies are in `~/Library/Application Support/YabaiSpaces/Backups/window-switching-20260913.naJBcW/`. See [WINDOW_SWITCHING.md](WINDOW_SWITCHING.md).

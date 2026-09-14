@@ -1,5 +1,11 @@
 # Session Log
 
+## 2026-09-14: Three direct switching shortcuts activated
+
+User loaded Hammerspoon IPC. Verified its live connection and retained the three active target handlers for selective rollback. Backed up skhdrc, focus-window.lua and the installed signed app in shortcut-handoff-20260914.K1EhLx. Installed matching-signed build ree466. Removed only the persistent direct cycle-mode section; Hammerspoon's own loadfile compiled the edited source. Homebrew Lua 5.5 rejected an unrelated old loop-variable assignment, so no unrelated compatibility rewrite was attempted. Ran the selective handoff without reloading Hammerspoon, and verified every other previously enabled hotkey remained enabled.
+
+Added Option-F19 → window next-in-space and Command-L/period → space next-recent to skhd; shell checks passed and skhd reloaded in place (PID 2401, event tap active, Input Monitoring granted). Live synthesized-chord tests verified Option-F19 switched 1056 → 1060 within Space 7 and both Command chords switched 1056 → 3880 from Space 7 to 8. Restored original window 1056. No physical modifier-tap verification is claimed. Right-Shift/F18, BTT, Karabiner, Caps, Tab, remaining Hammerspoon prefix/modal handlers and rendering code remain unchanged. See docs/SHORTCUT_MIGRATION.md for exact persistent edits, live tests and rollback. Documentation whitespace checks passed.
+
 ## 2026-09-13: Shortcut migration prepared; live handoff awaits Hammerspoon IPC
 
 Inspected current skhd, Karabiner and loaded Hammerspoon source before changing live configuration. The direct shortcuts are Option-F19 for window cycling and Command-L/period for recent-Space navigation. Hammerspoon normalizes the apparent right-side modifier strings to unsided modifiers; preserve that actual behavior. Added a separate space next-recent semantic command reproducing the existing other-Space traversal rather than misbinding those shortcuts to app/window next-across-spaces. The prefix/modal bindings remain out of this direct-shortcut migration.

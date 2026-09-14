@@ -1,5 +1,7 @@
 # Native application and window switching
 
+September 14 update: the existing Option-F19 and Command-L/period direct shortcuts now use skhd → YS. See [SHORTCUT_MIGRATION.md](SHORTCUT_MIGRATION.md) for the active mapping and the separate `space next-recent` command. This supersedes the original no-shortcuts-installed deployment notes below.
+
 The installed YS executable accepts these commands through its existing same-user socket:
 
 ```sh
