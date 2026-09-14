@@ -34,6 +34,8 @@ The client uses the existing same-user Unix socket, rejects symlinks/non-sockets
 
 ## Validation and deployment
 
+Update (2026-09-13): the user confirmed physical right-Shift works after the native migration. This supersedes the physical-input-unverified caveats in the historical notes below. A synthetic F18 retry remained inconclusive; a direct native show command visibly opened the panel. No permissions or input configuration were changed. See SESSION_LOG.md for the confirmation and proposed, not implemented, window-switching phase.
+
 Build a separate signed copy with `./run.sh --build-only`. Run `python3 -m unittest test_native_commands test_panel_commands test_merge_regressions test_run`: 31 tests cover the native client, argument parsing, help, missing servers, symlinks/non-sockets, all actions, partial/rejected/oversized replies, disconnects and timeout, plus prior command/merge/build-launcher regressions. Swift type checking, full Xcode build and strict matching signature verification passed for aJEclL. Native commands contacted the prior running app without another lasting UI instance. A missing-server call returned connection-refused exit 1; a broader process-name assertion failed and triggered rollback, so that particular process-count test was not treated as proof of clean startup behavior.
 
 Twelve sequential hide calls per client measured native median 9.7 ms (first 10.5, maximum 12.4) versus Python median 28.1 ms (first 26.9, maximum 28.4). These are local warm-process-launch measurements including acknowledgment, not guaranteed gesture latency or cold-boot performance.
