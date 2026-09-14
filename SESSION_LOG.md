@@ -1,5 +1,11 @@
 # Session Log
 
+## 2026-09-14: Caps tap activates the preserved window-management prefix
+
+User clarified that only tapping should change and every app-specific hold behavior must stay as before. Changed only to_if_alone in the three existing Karabiner Caps rules to F20, plus descriptive labels. Structural checks against backup confirmed all hold outputs, conditions and other key manipulators unchanged. Preserved existing Emacs/Portacle exclusions rather than introducing new hold behavior there. Backup is caps-prefix-20260914.2C8KBM.
+
+Added a small Hammerspoon caps-prefix adapter, loaded live without restarting, and required it after the persistent modal creation. It reuses the original letter/number actions with a renewable three-second timeout. Command single-tap remains on skhd/YS; only this legacy letter-prefix remains Hammerspoon-owned. Adapter syntax, live loading and JSON validation passed. Synthetic F20 entry, existing Q dismissal and timeout passed; physical Caps tapping and every application action were not independently retested. See docs/CAPS_PREFIX.md. A first generated patch had unsupported numeric hunk headers and made no changes; the exact-context patch then succeeded. Documentation whitespace checks passed.
+
 ## 2026-09-14: Command single-tap replaces double-tap/prefix
 
 User explicitly requested moving Command double-tap out of Hammerspoon and making it a single tap. Verified the existing live Command-F19 binding and Karabiner's existing tap-only emission. Backed up both configs to command-tap-20260914.Qq2rWT, removed the four-line persistent Hammerspoon prefix-entry binding, compiled the edited file with Hammerspoon's loadfile without executing it, exited any active prefix mode and disabled its live Command-F19 handler. Retained that handler in ysCommandTapRollback. Added cmd - f19 → native space next-recent to skhd, checked shell syntax and reloaded PID 2401 in place. No YS rebuild, Hammerspoon restart, Karabiner edit or modifier-hold change.
