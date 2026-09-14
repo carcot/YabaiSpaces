@@ -22,6 +22,8 @@ Customizable panel layout and display options
 
 ## Native panel commands (current source builds)
 
+Native [application/window switching](docs/WINDOW_SWITCHING.md) is also available: `YabaiSpaces app next-in-space` or `YabaiSpaces app next-across-spaces`, with previous-direction and individual-window variants. These do not install or replace keyboard shortcuts.
+
 Run the application executable directly to send a command to the already-running app without starting another GUI:
 
 ```sh

@@ -173,3 +173,74 @@ class YabaiClient {
 }
 
 let gYabaiClient = YabaiClient()
+
+final class WindowSwitchController {
+    private let queue = DispatchQueue(label: "YabaiSpaces.window-switching")
+    private var switching = WindowSwitching()
+    private let client = YabaiClient()
+
+    private func windows() throws -> [NavigationWindow] {
+        let response = try client.yabaiSocketCall("-m", "query", "--windows")
+        guard let records = response.response as? [[String: Any]] else {
+            throw YabaiError.invalidResponse("Expected navigation window records")
+        }
+        return records.compactMap(NavigationWindow.init)
+    }
+
+    private func currentSpace() throws -> Int {
+        let response = try client.yabaiSocketCall("-m", "query", "--spaces", "--space")
+        guard let record = response.response as? [String: Any], let index = record["index"] as? Int else {
+            throw YabaiError.invalidResponse("Expected current Space index")
+        }
+        return index
+    }
+
+    func observe() {
+        queue.async {
+            do {
+                self.switching.observe(try self.windows(), now: ProcessInfo.processInfo.systemUptime)
+            } catch {
+                NSLog("[YabaiSpaces] MRU observation failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func execute(_ command: SwitchCommand) {
+        queue.async {
+            do {
+                let windows = try self.windows()
+                let space = try self.currentSpace()
+                guard let target = self.switching.target(command, windows: windows, currentSpace: space,
+                                                        now: ProcessInfo.processInfo.systemUptime) else { return }
+                if target.space != space {
+                    try self.client.focusSpace(index: target.space)
+                    let deadline = ProcessInfo.processInfo.systemUptime + 1
+                    while try self.currentSpace() != target.space {
+                        guard ProcessInfo.processInfo.systemUptime < deadline else {
+                            throw YabaiError.queryFailed("Space transition did not complete")
+                        }
+                        Thread.sleep(forTimeInterval: 0.02)
+                    }
+                }
+                guard try self.windows().contains(where: { $0.id == target.id && $0.space == target.space }) else {
+                    throw YabaiError.queryFailed("Target window closed or moved during switching")
+                }
+                try self.client.focusWindow(id: target.id)
+                let deadline = ProcessInfo.processInfo.systemUptime + 1
+                var observed = try self.windows()
+                while !observed.contains(where: { $0.id == target.id && $0.focused }) {
+                    guard ProcessInfo.processInfo.systemUptime < deadline else {
+                        throw YabaiError.queryFailed("Window focus did not complete")
+                    }
+                    Thread.sleep(forTimeInterval: 0.02)
+                    observed = try self.windows()
+                }
+                self.switching.observe(observed, now: ProcessInfo.processInfo.systemUptime)
+                NSLog("[YabaiSpaces] \(command.rawValue): focused window \(target.id) in Space \(target.space)")
+            } catch {
+                self.switching.cancel()
+                NSLog("[YabaiSpaces] \(command.rawValue) failed: \(error.localizedDescription)")
+            }
+        }
+    }
+}

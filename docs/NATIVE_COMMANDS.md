@@ -18,6 +18,8 @@ Other actions are `show`, `hide`, and `activate-selected`. Semantics and existin
 
 ## Current dispatch
 
+YS also provides native application/window switching within and across Spaces. See [WINDOW_SWITCHING.md](WINDOW_SWITCHING.md) for commands, MRU timing, eligibility, validation and rollback. Existing panel dispatch is unchanged.
+
 skhd's only active F18 rule now is:
 
 ```text

@@ -68,7 +68,7 @@ import Darwin
                 self.assertEqual(result.returncode, 1)
                 self.assertIn("Refusing", result.stderr)
 
-    def exchange(self, chunks, status, action="show", delay=0):
+    def exchange(self, chunks, status, action="show", delay=0, unit="panel"):
         with tempfile.TemporaryDirectory(prefix="ys-native-", dir="/tmp") as directory:
             path = Path(directory) / "socket"
             requests = []
@@ -101,12 +101,12 @@ import Darwin
                 worker = threading.Thread(target=serve, daemon=True)
                 worker.start()
                 try:
-                    result = self.run_client(path, ["panel", action])
+                    result = self.run_client(path, [unit, action])
                 finally:
                     worker.join(timeout=4)
                 self.assertFalse(worker.is_alive())
                 self.assertEqual(errors, [])
-                self.assertEqual(requests, [f"panel {action}\n".encode()])
+                self.assertEqual(requests, [f"{unit} {action}\n".encode()])
                 self.assertEqual(result.returncode, status, result.stderr)
                 return result
 
@@ -117,6 +117,14 @@ import Darwin
 
     def test_fragmented_response(self):
         self.exchange([b"ok ", b"queued", b"\n"], 0)
+
+    def test_switch_commands(self):
+        for unit in ["app", "window"]:
+            for action in ["next-in-space", "previous-in-space", "next-across-spaces", "previous-across-spaces"]:
+                with self.subTest(unit=unit, action=action):
+                    self.exchange([b"ok queued\n"], 0, action, unit=unit)
+        for arguments in [["app", "show"], ["window", "next"], ["panel", "next-in-space"]]:
+            self.assertEqual(self.run_client("/missing", arguments).returncode, 2)
 
     def test_rejected_response(self):
         self.exchange([b"error invalid-command\n"], 1)

@@ -1,5 +1,17 @@
 # Session Log
 
+## 2026-09-13: Native application/window switching added
+
+Final verification: all 34 focused tests passed. Live application/window commands switched within Space 11 (135 → 108) and across Spaces 7 → 12 (1060 → 1071), verified through yabai focus queries, with original window 1060 restored. Application-mode tests verified different PIDs. SIP remains enabled; window_animation_duration remains 0.000000. Documentation whitespace checks passed. No physical shortcuts were remapped, and no exhaustive rendering/physical-key verification is claimed for this build.
+
+User requested switching applications within and across Spaces. Inspected the loaded Hammerspoon focus-window.lua: in-Space cycling freezes MRU ordering with a two-second sliding deadline, while next-Space navigation is a distinct behavior. Added eight allowlisted app/window next/previous commands for current/all-Space scope. Application mode groups by PID; window mode includes each eligible window. Kept Hammerspoon and all input bindings untouched rather than silently replacing their history or repurposing shortcuts. YS maintains its own observed MRU history, seeded from the startup yabai query; it does not claim to preserve Hammerspoon's historical ordering across processes.
+
+Added a separately testable selection engine and serialized background execution using the existing yabai connector. Focus transitions are verified, targets revalidated, and failures cancel cycling without injecting keys or opening permission dialogs. Existing window-refresh events feed observations. Rendering, native panel semantics, previous-Space, Caps, terminal Tab and BTT remain unchanged. See docs/WINDOW_SWITCHING.md for exact scope and limitations.
+
+Each Swift edit passed syntax parsing; the pure engine/parser passed type checking, Python tests passed compilation/import, and Xcode project plist validation passed. Isolated build De3uLb succeeded and was installed after matching designated-requirement verification and byte-verified backup at window-switching-20260913.naJBcW. The first signature-check invocation omitted codesign's inline requirement prefix; it failed before the running app was touched, then was corrected. Installation replaced only YS and verified one installed GUI process (PID 10000) plus native help/panel acknowledgment. No input services were reloaded.
+
+An initial live test verified switching applications within Space 11. The test helper then asked yabai to focus an already-current Space and failed; the original window was restored. Corrected the helper to skip redundant Space-focus requests, as the production controller already does. This was a test-helper issue, not a product change.
+
 ## 2026-09-13: Physical right-Shift confirmed; proposed window-switching phase
 
 After the native command migration, the user explicitly confirmed: "Right-shift is working right now." This verifies the physical right-Shift → Karabiner F18 → skhd → native YabaiSpaces command route in current use. A retry of synthetic F18 did not visibly open the panel, whereas a direct native show command did. The synthetic test is inconclusive, not evidence that the working physical shortcut is broken. This confirmation supersedes the earlier physical-input-unverified caveats; it does not establish the cause of the status subprocess's permission report or constitute exhaustive keyboard testing. No permission reset or configuration change was needed.

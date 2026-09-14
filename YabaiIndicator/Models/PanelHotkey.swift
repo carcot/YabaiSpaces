@@ -7,6 +7,21 @@
 
 import AppKit
 
+enum SwitchCommand: String, CaseIterable {
+    case nextWindowInSpace = "window next-in-space"
+    case previousWindowInSpace = "window previous-in-space"
+    case nextWindowAcrossSpaces = "window next-across-spaces"
+    case previousWindowAcrossSpaces = "window previous-across-spaces"
+    case nextAppInSpace = "app next-in-space"
+    case previousAppInSpace = "app previous-in-space"
+    case nextAppAcrossSpaces = "app next-across-spaces"
+    case previousAppAcrossSpaces = "app previous-across-spaces"
+
+    var applications: Bool { rawValue.hasPrefix("app ") }
+    var acrossSpaces: Bool { rawValue.hasSuffix("across-spaces") }
+    var backwards: Bool { rawValue.contains("previous-") }
+}
+
 enum PanelCommand: String, CaseIterable {
     case show = "panel show"
     case hide = "panel hide"

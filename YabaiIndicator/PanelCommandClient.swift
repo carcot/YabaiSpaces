@@ -10,19 +10,19 @@ enum PanelCommandClient {
     static func run(arguments: [String], socketPath: String = "/tmp/yabai-indicator.socket", timeout: TimeInterval = 3) -> Int32? {
         if arguments.isEmpty { return nil }
         if arguments.count == 1 && arguments[0].hasPrefix("-psn_") { return nil }
-        let usage = "Usage: YabaiIndicator panel {show|hide|toggle|activate-selected|activate-selected-or-show}\n"
+        let usage = "Usage: YabaiSpaces panel {show|hide|toggle|activate-selected|activate-selected-or-show}\n       YabaiSpaces {app|window} {next-in-space|previous-in-space|next-across-spaces|previous-across-spaces}\n"
         if arguments == ["--help"] || arguments == ["-h"] {
             FileHandle.standardOutput.write(Data(usage.utf8))
             return 0
         }
+        let message = arguments.joined(separator: " ")
         guard arguments.count == 2,
-              arguments[0] == "panel",
-              let command = PanelCommand(rawValue: arguments.joined(separator: " ")) else {
+              PanelCommand(rawValue: message) != nil || SwitchCommand(rawValue: message) != nil else {
             FileHandle.standardError.write(Data(usage.utf8))
             return 2
         }
         do {
-            try send(command, socketPath: socketPath, timeout: timeout)
+            try sendMessage(message, socketPath: socketPath, timeout: timeout)
             FileHandle.standardOutput.write(Data("Command queued\n".utf8))
             return 0
         } catch {
@@ -36,6 +36,10 @@ enum PanelCommandClient {
     }
 
     static func send(_ command: PanelCommand, socketPath: String, timeout: TimeInterval) throws {
+        try sendMessage(command.rawValue, socketPath: socketPath, timeout: timeout)
+    }
+
+    private static func sendMessage(_ message: String, socketPath: String, timeout: TimeInterval) throws {
         let deadline = ProcessInfo.processInfo.systemUptime + timeout
         var metadata = stat()
         guard lstat(socketPath, &metadata) == 0 else {
@@ -87,7 +91,7 @@ enum PanelCommandClient {
         guard getpeereid(descriptor, &peerUser, &peerGroup) == 0, peerUser == getuid() else {
             throw Failure(message: "Refusing a server not owned by this user")
         }
-        let request = Array((command.rawValue + "\n").utf8)
+        let request = Array((message + "\n").utf8)
         var offset = 0
         while offset < request.count {
             try wait(descriptor, events: Int16(POLLOUT), deadline: deadline)

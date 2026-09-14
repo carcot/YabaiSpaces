@@ -74,6 +74,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     var statusBarItem: NSStatusItem?
     var application: NSApplication = NSApplication.shared
     var spaceModel = SpaceModel()
+    private let windowSwitchController = WindowSwitchController()
 
     // Panel manager
     private var panelManager: PanelManager!
@@ -164,6 +165,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     }
 
     func onWindowRefresh() {
+        windowSwitchController.observe()
         // Always query windows for panel (hybrid preview needs window outlines)
         // regardless of menubar button style
         do {
@@ -602,6 +604,11 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
                     if let msg = msg, let command = PanelCommand(rawValue: msg) {
                         Task { @MainActor in
                             self.executePanelCommand(command)
+                        }
+                    } else if let msg = msg, let command = SwitchCommand(rawValue: msg) {
+                        Task { @MainActor in
+                            if self.floatingPanel?.isVisible == true { self.hidePanel() }
+                            self.windowSwitchController.execute(command)
                         }
                     } else if msg == "refresh" {
                         self.refreshData()

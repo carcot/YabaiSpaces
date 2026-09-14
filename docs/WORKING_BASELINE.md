@@ -1,5 +1,9 @@
 # User-confirmed working baseline — September 13, 2026
 
+## Current switching deployment
+
+Signed build De3uLb is installed with native application/window switching; it supersedes the installation descriptions below. The prior native-panel build's physical right-Shift route was user-confirmed before this deployment. The new build passed 34 automated tests and live focus-query checks for application/window switching both within Space 11 and from Space 7 to Space 12. Original window 1060 was restored. No input configuration or capture code changed, but this is not a new exhaustive visual/physical-key confirmation. Recovery copies are in `~/Library/Application Support/YabaiSpaces/Backups/window-switching-20260913.naJBcW/`. See [WINDOW_SWITCHING.md](WINDOW_SWITCHING.md).
+
 ## Native command deployment
 
 Build aJEclL is now installed to provide native panel commands. This does not claim new user confirmation while the user is away. Both the previous merged-main app and new app are backed up in `~/Library/Application Support/YabaiSpaces/Backups/native-cli-20260913.vYncb5/`; that directory also holds the previous skhdrc. Native commands and skhd reload passed; physical-key and visual checks remain pending. See NATIVE_COMMANDS.md for exact recovery and test details. The earlier confirmed baseline copies below remain unchanged.
