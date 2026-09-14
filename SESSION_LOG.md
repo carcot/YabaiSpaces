@@ -1,5 +1,13 @@
 # Session Log
 
+## 2026-09-13: Physical right-Shift confirmed; proposed window-switching phase
+
+After the native command migration, the user explicitly confirmed: "Right-shift is working right now." This verifies the physical right-Shift → Karabiner F18 → skhd → native YabaiSpaces command route in current use. A retry of synthetic F18 did not visibly open the panel, whereas a direct native show command did. The synthetic test is inconclusive, not evidence that the working physical shortcut is broken. This confirmation supersedes the earlier physical-input-unverified caveats; it does not establish the cause of the status subprocess's permission report or constitute exhaustive keyboard testing. No permission reset or configuration change was needed.
+
+Proposed next capability, not implemented: switching between windows within the current Space and across Spaces. Use windows rather than applications as the selection unit because one application can have windows in multiple Spaces. First inspect the existing timed MRU implementation, repeated-press cycling/reset rules, and previous-Space behavior. Preserve those semantics rather than invent replacements. YS should own target-window selection, activation, and any required Space transition; skhd should only dispatch semantic commands. Command names and shortcuts remain undecided pending that inspection. No new window-switching behavior or key bindings were introduced by this discussion.
+
+Verification for this documentation-only update: user-reported physical input success and direct-command visual observation are distinguished from inconclusive synthetic input. Documentation whitespace checks passed; no executable code changed or build was required.
+
 ## 2026-09-13: Native application command mode replaces live Python dispatch
 
 Publication housekeeping: the Debug executable populated a previously tracked empty default.profraw during command testing. Removed that generated coverage file from tracking and ignored profraw/profdata outputs; no executable source changes were needed. The local profiling output may remain on disk, but is not a source artifact.
