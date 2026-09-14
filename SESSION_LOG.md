@@ -1,5 +1,11 @@
 # Session Log
 
+## 2026-09-14: Command single-tap replaces double-tap/prefix
+
+User explicitly requested moving Command double-tap out of Hammerspoon and making it a single tap. Verified the existing live Command-F19 binding and Karabiner's existing tap-only emission. Backed up both configs to command-tap-20260914.Qq2rWT, removed the four-line persistent Hammerspoon prefix-entry binding, compiled the edited file with Hammerspoon's loadfile without executing it, exited any active prefix mode and disabled its live Command-F19 handler. Retained that handler in ysCommandTapRollback. Added cmd - f19 → native space next-recent to skhd, checked shell syntax and reloaded PID 2401 in place. No YS rebuild, Hammerspoon restart, Karabiner edit or modifier-hold change.
+
+One synthesized Command-F19 event verified a Space transition 8 → 4, with original window 136 restored. Physical tap recognition remains the unchanged Karabiner mapping, not a newly performed physical-key test. Both Command keys retain their previous unsided tap-signal coverage; the old prefix menu is intentionally no longer entered. Updated the migration snippet and documentation; whitespace checks passed.
+
 ## 2026-09-14: Three direct switching shortcuts activated
 
 User loaded Hammerspoon IPC. Verified its live connection and retained the three active target handlers for selective rollback. Backed up skhdrc, focus-window.lua and the installed signed app in shortcut-handoff-20260914.K1EhLx. Installed matching-signed build ree466. Removed only the persistent direct cycle-mode section; Hammerspoon's own loadfile compiled the edited source. Homebrew Lua 5.5 rejected an unrelated old loop-variable assignment, so no unrelated compatibility rewrite was attempted. Ran the selective handoff without reloading Hammerspoon, and verified every other previously enabled hotkey remained enabled.

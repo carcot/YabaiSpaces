@@ -1,3 +1,4 @@
 alt - f19 : /Applications/YabaiSpaces.app/Contents/MacOS/YabaiIndicator window next-in-space
+cmd - f19 : /Applications/YabaiSpaces.app/Contents/MacOS/YabaiIndicator space next-recent
 cmd - l : /Applications/YabaiSpaces.app/Contents/MacOS/YabaiIndicator space next-recent
 cmd - 0x2F : /Applications/YabaiSpaces.app/Contents/MacOS/YabaiIndicator space next-recent

@@ -1,5 +1,11 @@
 # Switching shortcut handoff (active September 14, 2026)
 
+## Command single-tap update
+
+At the user's request, Command-F19 now directly invokes `space next-recent` through skhd. Karabiner already emits Command-F19 when either Command key is tapped alone; its hold/chord rules were unchanged. This replaces the old first-tap-prefix/second-tap-switch behavior with one switch per tap. Repeated taps use YS's existing two-second cycling policy. The old Command-F19 prefix menu is no longer entered; its dormant modal definitions remain in the Lua file, but its four-line global entry binding was removed and its live handler disabled without reloading Hammerspoon. Other shortcuts remain unchanged.
+
+Backup before this update: `~/Library/Application Support/YabaiSpaces/Backups/command-tap-20260914.Qq2rWT/` contains both configs. `ysCommandTapRollback` retains the former live handler in the current Hammerspoon session. Restore skhdrc and reload skhd before restoring/re-enabling the old handler if rolling back. Persistent Lua compilation with Hammerspoon's own loadfile and shell syntax checks passed. A single synthesized `cmd - f19` changed Space 8 → 4; original window 136 was restored. Physical Command tapping itself was not synthesized or retested. The migration snippet now includes four rules; the earlier three-shortcut history below remains for reference.
+
 Signed build `YabaiSpaces-build.ree466` is installed. The three rules from `migration/switching.skhdrc` are active in the user's skhdrc. Their old Hammerspoon cycle-mode definitions were removed from persistent `~/.hammerspoon/focus-window.lua`, and only those three handlers were disabled in the running Hammerspoon process. No Hammerspoon reload occurred. Its remaining hotkeys were compared before/after and all remained enabled.
 
 Backup: `~/Library/Application Support/YabaiSpaces/Backups/shortcut-handoff-20260914.K1EhLx/` contains the original skhdrc, original focus-window.lua, and previous/original signed YS app copies. The replacement app passed strict verification against the previous app's designated signing requirement.
