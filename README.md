@@ -45,7 +45,9 @@ No arguments starts the normal app. Native command mode removes the Python helpe
 
 ## Thumbnail Capture
 
-macOS has no public API for capturing screenshots of inactive spaces. YabaiSpaces captures thumbnails when you leave a space (via the panel), preserving that space's visual state. Unvisited spaces show wireframe window outlines until you switch to them.
+YabaiSpaces captures visible desktops before opening the panel, then keeps those clean snapshots when you choose a destination. Reopening or repositioning an already-visible panel does not overwrite them with a screenshot containing the panel. YS switches without the panel (including recent-Space and cross-Space window/application commands) capture the outgoing desktop synchronously before focusing the destination. Spaces without a captured thumbnail show wallpaper plus window outlines.
+
+External switches that bypass YS, such as Mission Control gestures or direct yabai commands, do not trigger a pre-departure capture. Panel snapshots represent the moment just before the panel opened; they do not refresh while it remains visible.
 
 ## Requirements
 

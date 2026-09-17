@@ -1,5 +1,19 @@
 # Session Log
 
+## 2026-09-17: Restore pre-departure thumbnail capture across YS switching paths
+
+Installation follow-up: user requested installation for testing. Verified matching designated requirements and backed up /Applications/YabaiSpaces.app to /private/tmp/ys-thumbnail-install.XpqbSY/YabaiSpaces.app with a clean recursive byte comparison. Stopped PID 27774, installed build TCahRD, verified installed contents match the build and the signature passes, then launched the installed app as PID 65137. Installed --help loading passed. The first sandboxed signature check could not access trust services; the approved outside-sandbox check passed before replacement. Live thumbnail appearance and physical switching behavior remain for user testing.
+
+Root cause: June commit f718a43 removed capture from the departure path, leaving only panel-opening capture. Menubar and newer native MRU shortcuts bypassed that path entirely. Repeated panel-show requests could also capture an already-visible panel. Earlier documentation incorrectly described capture on every departure.
+
+Added a synchronous pre-focus notification at the shared YabaiClient.focusSpace boundary. The app completes capture on the main thread before the socket focus command, including background MRU callers. It queries fresh native Space state instead of the potentially stale UI model. Panel opening captures all visible desktops, while switches with a visible panel preserve those clean pre-panel images and hide the panel before focusing. Repeated show/reposition calls never overwrite thumbnails with the visible panel. Panel-free departures capture the outgoing active desktop and, for another display, its outgoing visible desktop. Capture uses the actual CoreGraphics display ID and no longer depends on an unused yabai window query. PNG-only caching remains unchanged.
+
+Scope: covers YS panel, menubar and native cross-Space/recent-Space commands. External gestures and direct yabai commands remain outside this hook. Pre-panel snapshots intentionally do not track changes occurring while the panel stays open. No post-switch capture is attempted under the outgoing Space ID.
+
+Verification: syntax parsing passed after each Swift edit; Python compilation and import passed. Seven tests passed across test_thumbnail_capture, test_window_switching and test_merge_regressions. The new executable Swift harness checks pre-focus ordering, panel exclusion/repeated show, fresh state, multi-display selection, redundant/invalid targets, failed focus and background-to-main synchronization. The first sandboxed build failed to download dependencies; the approved retry built and verified the signed app at /var/folders/b3/my4hx2zj60987cm3sl1ck4vm0000gn/T/YabaiSpaces-build.TCahRD/Build/Products/Debug/YabaiIndicator.app. Its --help command loaded successfully. Documentation whitespace validation passed. Installation and GUI process verification are recorded above; live thumbnail pixels and physical shortcuts remain unverified.
+
+Publication preparation: user requested documenting, committing and pushing all changes. Reviewed all seven changed files; no executable changes followed the successful tests/build. Origin SSH authentication failed, so publication uses the existing fork HTTPS remote, which points to the same carcot/YabaiSpaces repository and fetched successfully.
+
 ## 2026-09-14: Caps tap activates the preserved window-management prefix
 
 User clarified that only tapping should change and every app-specific hold behavior must stay as before. Changed only to_if_alone in the three existing Karabiner Caps rules to F20, plus descriptive labels. Structural checks against backup confirmed all hold outputs, conditions and other key manipulators unchanged. Preserved existing Emacs/Portacle exclusions rather than introducing new hold behavior there. Backup is caps-prefix-20260914.2C8KBM.

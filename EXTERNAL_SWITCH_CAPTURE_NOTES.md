@@ -1,6 +1,20 @@
 # External Switch Thumbnail Capture - Implementation Notes
 
-## Current Behavior
+## Current behavior (2026-09-17)
+
+All YS `YabaiClient.focusSpace` calls post a synchronous pre-focus notification. The app handles capture on the main thread before the command is sent, including when the caller is the background MRU controller. Fresh native Space state identifies the outgoing visible desktop; the asynchronously refreshed UI model is not used. On multiple displays, capture includes the active desktop and the visible desktop on the destination display. Capture uses the display's actual CoreGraphics ID.
+
+Before opening the panel, capture every visible desktop. While the panel is visible, retain those pre-panel snapshots and hide the panel before switching; never recapture the panel into them. Repeated show/reposition commands also skip capture while visible. A panel snapshot can therefore predate changes made underneath an open panel. Without the panel, capture happens immediately before departure.
+
+This covers panel selections, menubar buttons, recent-Space commands and cross-Space window/application commands routed through YS. Trackpad/Mission Control switches and direct external yabai commands still bypass this hook. A post-switch notification cannot recover the previous display's last pixels, even if the previous Space ID is known; do not capture the new desktop under the old ID.
+
+Regression verification: `python3 -m unittest test_thumbnail_capture test_window_switching test_merge_regressions`. The thumbnail harness executes the production preparation and focus methods against fake displays/panels/socket calls, including background-to-main synchronization. Actual screenshot contents require live visual verification.
+
+## Historical behavior and experiments (superseded)
+
+The remainder records earlier attempts; it is not a description of the current implementation.
+
+### Earlier behavior
 Thumbnails are only captured when switching spaces via the YabaiSpaces panel (clicking on a space button). This works correctly - the app captures the space being LEFT before switching to the new space.
 
 ## Desired Behavior
@@ -51,7 +65,7 @@ If revisiting this in the future, consider these approaches:
 
 5. **Yabai Signal Timing**: If Yabai signals are arriving before OS notifications, consider adding a delay to the signal handler or filtering out duplicate updates.
 
-## Current State
+## Earlier state
 - Thumbnail capture works correctly for panel-initiated switches
 - External switches update the UI but do NOT capture thumbnails
 - Reserved variables (`lastActiveSpaceId`, `didCaptureBeforeSwitch`, `spaceChangeCancellable`) remain in code for future use

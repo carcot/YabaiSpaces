@@ -85,14 +85,6 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         return panelManager?.panel
     }
 
-    // Track last active space for thumbnail capture
-    // (currently unused - reserved for future external switch capture implementation)
-    private var lastActiveSpaceId: UInt64 = 0
-
-    // Flag to prevent double-capture when we initiate the switch ourselves
-    // (currently unused - reserved for future implementation)
-    private var didCaptureBeforeSwitch = false
-
     // Ensure hotkeys are only set up once (Combine publisher may fire during init)
     private var hasSetupHotkeys = false
 
@@ -133,34 +125,48 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         }
     }
 
-    // Capture thumbnail for a specific space (call when space becomes inactive)
     func captureThumbnail(for space: Space) {
         let displays = gNativeClient.queryDisplays()
-        guard space.display - 1 >= 0, space.display - 1 < displays.count else {
+        guard let display = displays.first(where: { $0.index == space.display - 1 }) else {
             return
         }
-        let display = displays[space.display - 1]
+        let baseHeight: CGFloat = 20 * panelLayout.scale
+        let aspect = display.frame.width / display.frame.height
+        let targetSize = CGSize(width: baseHeight * aspect, height: baseHeight)
+        if let data = gPrivateWindowCapture.captureSpace(display: display, targetSize: targetSize) {
+            gThumbnailCache.set(spaceId: space.spaceid, data: data)
+        }
+    }
 
-        // CRITICAL: Query windows synchronously BEFORE space switch
-        do {
-            let windows = try gYabaiClient.queryWindows()
-            let spaceWindows = windows.filter { $0.spaceIndex == space.yabaiIndex }
+    func captureVisibleThumbnails() {
+        guard floatingPanel?.isVisible != true else { return }
+        for space in gNativeClient.querySpaces() where space.visible {
+            captureThumbnail(for: space)
+        }
+    }
 
-            // Calculate thumbnail size proportional to display aspect ratio
-            let baseHeight: CGFloat = 20 * panelLayout.scale
-            let aspect = display.frame.width / display.frame.height
-            let targetSize = CGSize(width: baseHeight * aspect, height: baseHeight)
-
-            if let data = gPrivateWindowCapture.captureSpace(
-                windows: spaceWindows,
-                display: display,
-                targetSize: targetSize
-            ) {
-                gThumbnailCache.set(spaceId: space.spaceid, data: data)
+    func prepareForSpaceSwitch(to index: Int) {
+        let spaces = gNativeClient.querySpaces()
+        guard let target = spaces.first(where: { $0.yabaiIndex == index }), !target.active else { return }
+        if floatingPanel?.isVisible != true {
+            for space in spaces where space.visible && (space.active || space.display == target.display) {
+                captureThumbnail(for: space)
             }
-        } catch {
-            NSLog("[YabaiSpaces] Failed to query windows for thumbnail capture: \(error.localizedDescription)")
-            // Non-critical - continue without thumbnail
+        }
+        if floatingPanel?.isVisible == true {
+            panelManager?.cursorRestorationPolicy = .skip
+            hidePanel()
+        }
+    }
+
+    @objc func onWillFocusSpace(_ notification: Notification) {
+        guard let index = notification.object as? Int else { return }
+        if Thread.isMainThread {
+            prepareForSpaceSwitch(to: index)
+        } else {
+            DispatchQueue.main.sync {
+                self.prepareForSpaceSwitch(to: index)
+            }
         }
     }
 
@@ -279,10 +285,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     func showPanel(at mouseLocation: NSPoint, modifiers: PanelModifiers = .none) {
         logMemoryUsage(context: "panel_open")
 
-        // Capture current space thumbnail before showing panel
-        if let currentSpace = spaceModel.spaces.first(where: { $0.active }) {
-            captureThumbnail(for: currentSpace)
-        }
+        captureVisibleThumbnails()
 
         // Map CursorPosition to PanelModifiers
         let panelModifiers: PanelModifiers
@@ -304,10 +307,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
         let mouseLoc = NSEvent.mouseLocation
 
-        // Capture current space thumbnail before showing panel
-        if let currentSpace = spaceModel.spaces.first(where: { $0.active }) {
-            captureThumbnail(for: currentSpace)
-        }
+        captureVisibleThumbnails()
 
         panelManager.show(at: mouseLoc, modifiers: modifiers)
         resetPanelSelection()
@@ -762,6 +762,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     }
 
     func registerObservers() {
+        NotificationCenter.default.addObserver(self, selector: #selector(self.onWillFocusSpace(_:)), name: YabaiClient.willFocusSpace, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(self.onSpaceChanged(_:)), name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(self.onDisplayChanged(_:)), name: Notification.Name("NSWorkspaceActiveDisplayDidChangeNotification"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(self.onOpenPreferencesNotification(_:)), name: NSNotification.Name("OpenPreferences"), object: nil)

@@ -235,10 +235,10 @@ class PrivateWindowCapture {
         return nil
     }
 
-    func captureSpace(windows: [Window], display: Display, targetSize: CGSize) -> Data? {
+    func captureSpace(display: Display, targetSize: CGSize) -> Data? {
         return captureQueue.sync {
-            guard let displayID = getDisplayID(for: display.index),
-                  let displayImage = CGDisplayCreateImage(displayID),
+            let displayID = CGDirectDisplayID(display.id)
+            guard let displayImage = CGDisplayCreateImage(displayID),
                   let scaledImage = scaleImage(displayImage, to: targetSize) else {
                 return nil
             }

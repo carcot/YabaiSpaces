@@ -50,6 +50,7 @@ enum YabaiError: Error, LocalizedError {
 }
 
 class YabaiClient {
+    static let willFocusSpace = Notification.Name("YabaiSpaces.willFocusSpace")
 
     func _yabaiSocketCall(_ args: [String]) -> (Int, String) {
         var cresp:UnsafeMutablePointer<CChar>? = nil
@@ -99,6 +100,7 @@ class YabaiClient {
     }
 
     func focusSpace(index: Int) throws {
+        NotificationCenter.default.post(name: Self.willFocusSpace, object: index)
         try yabaiSocketCall(
             "-m", "space", "--focus", "\(index)")
     }
