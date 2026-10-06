@@ -10,20 +10,30 @@ enum PanelCommandClient {
     static func run(arguments: [String], socketPath: String = "/tmp/yabai-indicator.socket", timeout: TimeInterval = 3) -> Int32? {
         if arguments.isEmpty { return nil }
         if arguments.count == 1 && arguments[0].hasPrefix("-psn_") { return nil }
-        let usage = "Usage: YabaiSpaces panel {show|hide|toggle|activate-selected|activate-selected-or-show}\n       YabaiSpaces {app|window} {next-in-space|previous-in-space|next-across-spaces|previous-across-spaces}\n       YabaiSpaces space next-recent\n"
+        let usage = "Usage: YabaiSpaces panel {show|hide|toggle|activate-selected|activate-selected-or-show}\n       YabaiSpaces {app|window} {next-in-space|previous-in-space|next-across-spaces|previous-across-spaces}\n       YabaiSpaces space next-recent\n       YabaiSpaces prefix {start|cancel}\n       YabaiSpaces jump {a-z|0-9|-|=}\n"
+        let handlingUsage = "       YabaiSpaces window {move-left|move-right|move-up|move-down|wider|narrower|taller|shorter|toggle-float|toggle-split}\n       YabaiSpaces space {tile|untile}\n       YabaiSpaces handling {on|off}\n       YabaiSpaces config reload\n       YabaiSpaces event {window-focused|window-destroyed} <id>\n       YabaiSpaces event reconcile\n       YabaiSpaces focus status\n"
         if arguments == ["--help"] || arguments == ["-h"] {
-            FileHandle.standardOutput.write(Data(usage.utf8))
+            FileHandle.standardOutput.write(Data((usage + handlingUsage).utf8))
             return 0
         }
         let message = arguments.joined(separator: " ")
-        guard arguments.count == 2,
-              PanelCommand(rawValue: message) != nil || SwitchCommand(rawValue: message) != nil else {
-            FileHandle.standardError.write(Data(usage.utf8))
+        let ordinary = arguments.count == 2 && (PanelCommand(rawValue: message) != nil || SwitchCommand(rawValue: message) != nil
+                || PrefixCommand(rawValue: message) != nil || JumpCommand(rawValue: message) != nil
+                || WindowHandlingCommand(rawValue: message) != nil || ConfigurationCommand(rawValue: message) != nil)
+        let focusEvent = arguments.count == 3 && arguments[0] == "event" && FocusEventCommand(rawValue: message) != nil
+        guard ordinary || focusEvent || arguments == ["event", "reconcile"]
+                || arguments == ["focus", "status"] else {
+            FileHandle.standardError.write(Data((usage + handlingUsage).utf8))
             return 2
         }
         do {
-            try sendMessage(message, socketPath: socketPath, timeout: timeout)
-            FileHandle.standardOutput.write(Data("Command queued\n".utf8))
+            let response = try sendMessage(message, socketPath: socketPath, timeout: timeout)
+            if message == "focus status" {
+                FileHandle.standardOutput.write(Data(response.utf8))
+                return 0
+            }
+            let result = ConfigurationCommand(rawValue: message) == .reload ? "Configuration reloaded\n" : "Command queued\n"
+            FileHandle.standardOutput.write(Data(result.utf8))
             return 0
         } catch {
             FileHandle.standardError.write(Data("YS command failed: \(error.localizedDescription)\n".utf8))
@@ -39,7 +49,8 @@ enum PanelCommandClient {
         try sendMessage(command.rawValue, socketPath: socketPath, timeout: timeout)
     }
 
-    private static func sendMessage(_ message: String, socketPath: String, timeout: TimeInterval) throws {
+    @discardableResult
+    private static func sendMessage(_ message: String, socketPath: String, timeout: TimeInterval) throws -> String {
         let deadline = ProcessInfo.processInfo.systemUptime + timeout
         var metadata = stat()
         guard lstat(socketPath, &metadata) == 0 else {
@@ -103,20 +114,31 @@ enum PanelCommandClient {
             offset += sent
         }
         var response: [UInt8] = []
+        let maximum = message == "focus status" ? 32768 : 128
         while !response.contains(10) {
             try wait(descriptor, events: Int16(POLLIN), deadline: deadline)
-            var buffer = [UInt8](repeating: 0, count: 129 - response.count)
+            var buffer = [UInt8](repeating: 0, count: min(4096, maximum + 1 - response.count))
             let received = recv(descriptor, &buffer, buffer.count, 0)
             if received < 0 && (errno == EINTR || errno == EAGAIN) { continue }
             guard received > 0 else {
                 throw Failure(message: "No acknowledgment; the running YabaiSpaces may not support panel commands")
             }
             response.append(contentsOf: buffer.prefix(received))
-            guard response.count <= 128 else { throw Failure(message: "Invalid oversized response") }
+            guard response.count <= maximum else { throw Failure(message: "Invalid oversized response") }
+        }
+        if let rejection = String(bytes: response, encoding: .utf8), rejection.hasPrefix("error ") {
+            throw Failure(message: String(rejection.dropFirst(6)).trimmingCharacters(in: .newlines))
+        }
+        if message == "focus status" {
+            guard response.last == 10,
+                  (try? JSONSerialization.jsonObject(with: Data(response))) is [String: Any],
+                  let text = String(bytes: response, encoding: .utf8) else { throw Failure(message: "Invalid focus status") }
+            return text
         }
         guard response == Array("ok queued\n".utf8) else {
             throw Failure(message: "YabaiSpaces rejected the command")
         }
+        return "ok queued\n"
     }
 
     private static func wait(_ descriptor: Int32, events: Int16, deadline: TimeInterval) throws {

@@ -1,5 +1,13 @@
 # Switching shortcut handoff (active September 14, 2026)
 
+## October 5 cleanup — 1.6.0
+
+Removed the global `cmd - l` binding from active skhd configuration and the migration snippet, restoring Command-L to the focused application. Right-Command tap still dispatches Command-F19 to `space next-recent`; the existing Command-period and Right-Option-tap bindings are retained. Caps-period is separately removed from the native prefix. The September handoff and Command-L test records below describe historical behavior.
+
+## October 1: Left-Command tap disabled
+
+Removed only the Karabiner rule that emitted Left-Command-F19 when Left Command was tapped alone. Left Command now passes through normally with no tap action. Right-Command tap still invokes recent-Space cycling through the unchanged skhd Command-F19 binding. Caps-tap-letter, Caps holds, Command-L/period chords, and all other mappings are unchanged. Karabiner confirmed loading the updated configuration; YS was restarted as requested. Physical keyboard testing remains with the user. Configuration backup: `/private/tmp/ys-left-command.eWrBIz/original.json`. Earlier descriptions referring to either Command key are historical.
+
 ## Command single-tap update
 
 At the user's request, Command-F19 now directly invokes `space next-recent` through skhd. Karabiner already emits Command-F19 when either Command key is tapped alone; its hold/chord rules were unchanged. This replaces the old first-tap-prefix/second-tap-switch behavior with one switch per tap. Repeated taps use YS's existing two-second cycling policy. The old Command-F19 prefix menu is no longer entered; its dormant modal definitions remain in the Lua file, but its four-line global entry binding was removed and its live handler disabled without reloading Hammerspoon. Other shortcuts remain unchanged.
@@ -20,7 +28,7 @@ Backup: `~/Library/Application Support/YabaiSpaces/Backups/shortcut-handoff-2026
 
 The old Lua strings say `rightalt` and `rightcmd`, but Hammerspoon's installed `hs.hotkey.getMods` uses substring matching and normalizes these to unsided Option/Command. The proposed skhd rules deliberately preserve that existing behavior, including Command-L on either side. This is not an opportunity to silently change shortcuts. Keycode 0x2F is period.
 
-Recent-Space selection reproduces the old `find_next_space` traversal: find the first current-Space entry in the frozen MRU list, then take the first later eligible window in another Space; if none, wrap to the first other-Space window. No other Space means no-op. It shares the two-second sliding cycling timeout but has a separate scope from all-window/all-application cycling. `app next-across-spaces` is not an equivalent replacement because it may remain on the current Space.
+September 25 correction: recent-Space selection keeps only the first eligible window per Space from the frozen MRU list, then advances to the next representative window with wraparound. The earlier literal `find_next_space` traversal could loop between duplicate Space entries and fail to reach later candidates. No other Space means no-op; empty Spaces are excluded. It shares the two-second sliding cycling timeout but has a separate scope from all-window/all-application cycling. Panel selection ends the cycle without waiting for that timeout and resumes normal focus-history updates. `app next-across-spaces` is not an equivalent replacement because it may remain on the current Space. The old Command double-tap prefix path did not freeze history like the old Command-L/period cycling modes did.
 
 The Command-F19 prefix/modal and its application/Space selections remain in Hammerspoon. Right-Shift/F18, Hyper-Space, Caps, Tab, Karabiner and BTT remain untouched. YS keeps its own learned MRU order; Hammerspoon's private history is not transferred.
 

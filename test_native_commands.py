@@ -68,7 +68,8 @@ import Darwin
                 self.assertEqual(result.returncode, 1)
                 self.assertIn("Refusing", result.stderr)
 
-    def exchange(self, chunks, status, action="show", delay=0, unit="panel"):
+    def exchange(self, chunks, status, action="show", delay=0, unit="panel", arguments=None):
+        arguments = arguments if arguments is not None else [unit, action]
         with tempfile.TemporaryDirectory(prefix="ys-native-", dir="/tmp") as directory:
             path = Path(directory) / "socket"
             requests = []
@@ -101,12 +102,12 @@ import Darwin
                 worker = threading.Thread(target=serve, daemon=True)
                 worker.start()
                 try:
-                    result = self.run_client(path, [unit, action])
+                    result = self.run_client(path, arguments)
                 finally:
                     worker.join(timeout=4)
                 self.assertFalse(worker.is_alive())
                 self.assertEqual(errors, [])
-                self.assertEqual(requests, [f"{unit} {action}\n".encode()])
+                self.assertEqual(requests, [(" ".join(arguments) + "\n").encode()])
                 self.assertEqual(result.returncode, status, result.stderr)
                 return result
 
@@ -127,8 +128,51 @@ import Darwin
         for arguments in [["app", "show"], ["window", "next"], ["panel", "next-in-space"]]:
             self.assertEqual(self.run_client("/missing", arguments).returncode, 2)
 
+    def test_prefix_and_jump_commands(self):
+        for action in ["start", "cancel"]:
+            self.exchange([b"ok queued\n"], 0, action, unit="prefix")
+        for action in "abcdefghijklmnopqrstuvwxyz0123456789-=":
+            self.exchange([b"ok queued\n"], 0, action, unit="jump")
+        for arguments in [["jump", "aa"], ["jump", "."], ["jump", "A"], ["jump", "s", "extra"], ["prefix", "show"]]:
+            self.assertEqual(self.run_client("/missing", arguments).returncode, 2)
+
     def test_rejected_response(self):
         self.exchange([b"error invalid-command\n"], 1)
+
+    def test_configuration_reload(self):
+        result = self.exchange([b"ok queued\n"], 0, "reload", unit="config")
+        self.assertIn("Configuration reloaded", result.stdout)
+        result = self.exchange([b"error Caps reload failed; previous bindings retained\n"], 1,
+                               "reload", unit="config")
+        self.assertIn("Caps reload failed", result.stderr)
+        for arguments in [["config"], ["config", "load"], ["config", "reload", "extra"]]:
+            self.assertEqual(self.run_client("/missing", arguments).returncode, 2)
+
+    def test_focus_events_and_diagnostics(self):
+        for event in ["window-focused", "window-destroyed"]:
+            self.exchange([b"ok queued\n"], 0, arguments=["event", event, "42"])
+            for identifier in ["0", "-1", "+1", "4294967296", "18446744073709551616", "1 extra", ""]:
+                self.assertEqual(self.run_client("/missing", ["event", event, identifier]).returncode, 2)
+        for arguments in [["event", "window-focused"], ["event", "window-focused", "1", "extra"],
+                          ["event", "unsupported", "1"], ["focus", "unsupported"], ["event", "reconcile", "1"]]:
+            self.assertEqual(self.run_client("/missing", arguments).returncode, 2)
+        self.exchange([b"ok queued\n"], 0, arguments=["event", "reconcile"])
+        result = self.exchange([b'{"accepted":', b'1,"records":[]}\n'], 0, arguments=["focus", "status"])
+        self.assertIn('"accepted":1', result.stdout)
+        self.exchange([b"ok queued\n"], 1, arguments=["focus", "status"])
+        self.exchange([b"error focus ingress full\n"], 1, arguments=["event", "window-focused", "42"])
+        self.exchange([b"x" * 32769], 1, arguments=["focus", "status"])
+
+    def test_window_handling_commands(self):
+        for action in ["move-left", "move-right", "move-up", "move-down", "wider", "narrower",
+                       "taller", "shorter", "toggle-float", "toggle-split"]:
+            self.exchange([b"ok queued\n"], 0, action, unit="window")
+        for action in ["tile", "untile"]:
+            self.exchange([b"ok queued\n"], 0, action, unit="space")
+        for action in ["on", "off"]:
+            self.exchange([b"ok queued\n"], 0, action, unit="handling")
+        for arguments in [["window", "resize"], ["space", "tile", "all"], ["handling", "toggle"]]:
+            self.assertEqual(self.run_client("/missing", arguments).returncode, 2)
 
     def test_old_server_and_disconnect(self):
         self.exchange([], 1)

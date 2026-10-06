@@ -18,6 +18,8 @@ Other actions are `show`, `hide`, and `activate-selected`. Semantics and existin
 
 ## Current dispatch
 
+YS 1.8.0 adds `event window-focused <id>`, `event window-destroyed <id>`, `event reconcile`, and `focus status`. Event IDs must be positive decimal 32-bit window IDs. Events are internal yabai automation, not shortcuts; malformed commands fail before GUI startup. Event acknowledgment means bounded in-memory intake, not durable recording or completed history reconciliation. Do not automatically retry an ambiguous timeout. `focus status` returns JSON diagnostics with at most 32 recent records and a 32 KiB reply limit; other commands retain the 128-byte reply limit. See [FOCUS_TRACKING.md](FOCUS_TRACKING.md) for ordering, filtering, health counters, signal ownership, and rollback. The two-second cycle and existing command deadlines remain unchanged.
+
 YS also provides native application/window switching within and across Spaces. See [WINDOW_SWITCHING.md](WINDOW_SWITCHING.md) for commands, MRU timing, eligibility, validation and rollback. Existing panel dispatch is unchanged.
 
 skhd's only active F18 rule now is:

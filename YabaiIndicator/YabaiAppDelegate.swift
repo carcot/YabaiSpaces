@@ -75,6 +75,13 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     var application: NSApplication = NSApplication.shared
     var spaceModel = SpaceModel()
     private let windowSwitchController = WindowSwitchController()
+    private let cyclingWindowBorder = CyclingWindowBorder()
+    private let windowHandlingController = WindowHandlingController()
+    private let capsConfiguration = CapsConfigurationStore()
+    private lazy var capsPrefixController = CapsPrefixController { [weak self] command in
+        guard let self else { return }
+        self.windowSwitchController.execute(self.capsConfiguration.resolve(command))
+    }
 
     // Panel manager
     private var panelManager: PanelManager!
@@ -139,6 +146,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     }
 
     func captureVisibleThumbnails() {
+        cyclingWindowBorder.hide()
         guard floatingPanel?.isVisible != true else { return }
         for space in gNativeClient.querySpaces() where space.visible {
             captureThumbnail(for: space)
@@ -146,6 +154,8 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     }
 
     func prepareForSpaceSwitch(to index: Int) {
+        windowHandlingController.cancel()
+        cyclingWindowBorder.hide()
         let spaces = gNativeClient.querySpaces()
         guard let target = spaces.first(where: { $0.yabaiIndex == index }), !target.active else { return }
         if floatingPanel?.isVisible != true {
@@ -283,6 +293,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     }
 
     func showPanel(at mouseLocation: NSPoint, modifiers: PanelModifiers = .none) {
+        windowHandlingController.cancel()
         logMemoryUsage(context: "panel_open")
 
         captureVisibleThumbnails()
@@ -303,6 +314,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
     }
 
     func showPanelCentered(modifiers: PanelModifiers = .none) {
+        windowHandlingController.cancel()
         logMemoryUsage(context: "panel_open_centered")
 
         let mouseLoc = NSEvent.mouseLocation
@@ -325,6 +337,8 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             let selectedSpace = spaces[selectedIndex]
             if !selectedSpace.active && selectedSpace.yabaiIndex > 0 {
                 switchSpace(to: selectedSpace.yabaiIndex)
+            } else {
+                windowSwitchController.observe(endingCycle: true)
             }
         }
         hidePanel()
@@ -581,6 +595,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             guard chmod("/tmp/yabai-indicator.socket", 0o600) == 0 else {
                 throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
             }
+            windowSwitchController.startTracking()
 
             while true {
                 do {
@@ -600,10 +615,47 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
                     let msg = readSocketMessage(sockfd)
                     var accepted = true
+                    var configurationFailed = false
+                    var focusReply: String?
+                    var focusOverflow = false
 
-                    if let msg = msg, let command = PanelCommand(rawValue: msg) {
+                    if let msg, let event = FocusEventCommand(rawValue: msg) {
+                        accepted = windowSwitchController.receive(event)
+                        focusOverflow = !accepted
+                    } else if msg == "event reconcile" {
+                        windowSwitchController.observe()
+                    } else if msg == "focus status" {
+                        focusReply = windowSwitchController.diagnostics() + "\n"
+                    } else if let msg = msg, let command = PanelCommand(rawValue: msg) {
                         Task { @MainActor in
                             self.executePanelCommand(command)
+                        }
+                    } else if let msg = msg, ConfigurationCommand(rawValue: msg) == .reload {
+                        do {
+                            let count = try self.capsConfiguration.reload()
+                            NSLog("[YabaiSpaces] Reloaded %d Caps bindings from %@", count, self.capsConfiguration.url.path)
+                        } catch {
+                            configurationFailed = true
+                            NSLog("[YabaiSpaces] Caps reload failed; previous bindings retained: %@", error.localizedDescription)
+                        }
+                    } else if let msg = msg, let command = WindowHandlingCommand(rawValue: msg) {
+                        Task { @MainActor in
+                            self.windowHandlingController.execute(command)
+                        }
+                    } else if let msg = msg, let command = PrefixCommand(rawValue: msg) {
+                        Task { @MainActor in
+                            if command == .start {
+                                if self.floatingPanel?.isVisible == true { self.hidePanel() }
+                                self.capsPrefixController.start()
+                            } else {
+                                self.capsPrefixController.cancel()
+                            }
+                        }
+                    } else if let msg = msg, let command = JumpCommand(rawValue: msg) {
+                        Task { @MainActor in
+                            self.capsPrefixController.cancel()
+                            if self.floatingPanel?.isVisible == true { self.hidePanel() }
+                            self.windowSwitchController.execute(self.capsConfiguration.resolve(command))
                         }
                     } else if let msg = msg, let command = SwitchCommand(rawValue: msg) {
                         Task { @MainActor in
@@ -623,9 +675,18 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
                     } else {
                         accepted = false
                     }
-                    let reply = accepted ? "ok queued\n" : "error invalid-command\n"
-                    reply.withCString { pointer in
-                        _ = send(sockfd, pointer, reply.utf8.count, 0)
+                    let reply = focusReply ?? (focusOverflow ? "error focus ingress full; reconciliation requested\n" : (configurationFailed
+                        ? "error Caps reload failed; use YS menu > Reload Caps bindings for details\n"
+                        : (accepted ? "ok queued\n" : "error invalid-command\n")))
+                    let bytes = Array(reply.utf8)
+                    var offset = 0
+                    while offset < bytes.count {
+                        let count = bytes.withUnsafeBytes {
+                            send(sockfd, $0.baseAddress!.advanced(by: offset), bytes.count - offset, 0)
+                        }
+                        if count < 0 && errno == EINTR { continue }
+                        guard count > 0 else { break }
+                        offset += count
                     }
                 } catch let error where error is Socket.Error {
                     // Socket error - log and continue
@@ -741,6 +802,40 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         return view
     }
 
+    @objc private func handleWindowMenu(_ sender: NSMenuItem) {
+        guard let value = sender.representedObject as? String,
+              let command = WindowHandlingCommand(rawValue: value) else { return }
+        windowHandlingController.execute(command)
+    }
+
+    @objc private func editCapsConfiguration() {
+        if !NSWorkspace.shared.open(capsConfiguration.url) {
+            NSWorkspace.shared.activateFileViewerSelecting([capsConfiguration.url])
+        }
+    }
+
+    @objc private func reloadCapsConfiguration() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let message: String
+            let failed: Bool
+            do {
+                let count = try self.capsConfiguration.reload()
+                message = "Loaded \(count) application bindings from \(self.capsConfiguration.url.path)."
+                failed = false
+            } catch {
+                message = "\(error.localizedDescription)\n\nPrevious bindings remain active.\n\(self.capsConfiguration.url.path)"
+                failed = true
+            }
+            DispatchQueue.main.async {
+                let alert = NSAlert()
+                alert.messageText = failed ? "Caps configuration not reloaded" : "Caps bindings reloaded"
+                alert.informativeText = message
+                alert.alertStyle = failed ? .warning : .informational
+                alert.runModal()
+            }
+        }
+    }
+
     func createMenu() -> NSMenu {
         let statusBarMenu = NSMenu()
         statusBarMenu.addItem(
@@ -753,7 +848,27 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
             action: #selector(openPreferences),
             keyEquivalent: "")
         statusBarMenu.addItem(NSMenuItem.separator())
-
+        let windowMenu = NSMenu()
+        let gestures = windowMenu.addItem(withTitle: "Control–Option drag: move; right-drag: resize", action: nil, keyEquivalent: "")
+        gestures.isEnabled = false
+        for (title, command) in [("Enable mouse controls", WindowHandlingCommand.enable),
+                                 ("Disable mouse controls", .disable),
+                                 ("Tile current Space (automatic BSP)", .tile),
+                                 ("Stop tiling current Space", .untile),
+                                 ("Toggle focused window floating", .toggleFloat),
+                                 ("Toggle focused split direction", .toggleSplit)] {
+            let item = windowMenu.addItem(withTitle: title, action: #selector(handleWindowMenu(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = command.rawValue
+        }
+        let windowItem = statusBarMenu.addItem(withTitle: "Window controls", action: nil, keyEquivalent: "")
+        windowItem.submenu = windowMenu
+        statusBarMenu.addItem(NSMenuItem.separator())
+        let editCaps = statusBarMenu.addItem(withTitle: "Edit Caps bindings…", action: #selector(editCapsConfiguration), keyEquivalent: "")
+        editCaps.target = self
+        let reloadCaps = statusBarMenu.addItem(withTitle: "Reload Caps bindings", action: #selector(reloadCapsConfiguration), keyEquivalent: "")
+        reloadCaps.target = self
+        statusBarMenu.addItem(NSMenuItem.separator())
         statusBarMenu.addItem(
             withTitle: "Quit",
             action: #selector(quit),
@@ -774,6 +889,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
 
     // Switch spaces, optionally focusing a specific window
     func switchSpace(to yabaiIndex: Int, focusWindowId: UInt64? = nil) {
+        windowSwitchController.observe(endingCycle: true)
         do {
             // Perform the space switch
             try gYabaiClient.focusSpace(index: yabaiIndex)
@@ -801,6 +917,7 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
                         // Non-critical error - space switched successfully
                     }
                 }
+                self.windowSwitchController.observe()
             }
         } catch let error as YabaiError {
             NSLog("[YabaiSpaces] Failed to switch to space \(yabaiIndex): \(error.localizedDescription)")
@@ -895,6 +1012,13 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         panelManager.keyboardDelegate = self
         _ = panelManager.createPanel()
 
+        do {
+            let count = try capsConfiguration.reload(createIfMissing: true)
+            NSLog("[YabaiSpaces] Loaded %d Caps bindings from %@", count, capsConfiguration.url.path)
+        } catch {
+            NSLog("[YabaiSpaces] Caps configuration failed; built-in defaults retained: %@", error.localizedDescription)
+        }
+
         // Run socket server in background - suppress Sendable warning as this is intentional
         Task.detached(priority: .background) { [weak self] in
             await self?.socketServer()
@@ -913,12 +1037,20 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         }
 
         registerObservers()
+        cyclingWindowBorder.isBlocked = { [weak self] in self?.floatingPanel?.isVisible == true }
+        windowSwitchController.onCycleChange = { [weak self] windowID, deadline in
+            self?.cyclingWindowBorder.update(windowID: windowID, deadline: deadline)
+        }
+        capsPrefixController.install()
+        windowHandlingController.isBlocked = { [weak self] in self?.floatingPanel?.isVisible == true }
+        windowHandlingController.start()
 
         // Log memory usage at startup
         logMemoryUsage(context: "startup")
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        cyclingWindowBorder.clear()
         // Clear caches to free memory
         gButtonImageCache.clear()
         gThumbnailCache.clear()

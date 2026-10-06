@@ -49,12 +49,27 @@ class Panel {
     var cursorRestorationPolicy = CursorPolicy.restore
 }
 var events: [String] = []
+class WindowHandlingController {
+    var previewVisible = false
+    func cancel() {
+        precondition(Thread.isMainThread)
+        previewVisible = false
+    }
+}
+class CyclingWindowBorder {
+    var visible = false
+    func hide() { visible = false }
+}
 class Delegate {
+    let windowHandlingController = WindowHandlingController()
+    let cyclingWindowBorder = CyclingWindowBorder()
     var floatingPanel: Panel? = Panel()
     var panelManager: Panel? { floatingPanel }
     func captureThumbnail(for space: Space) {
         precondition(Thread.isMainThread)
         precondition(floatingPanel?.isVisible != true)
+        precondition(!windowHandlingController.previewVisible)
+        precondition(!cyclingWindowBorder.visible)
         events.append("capture-\(space.yabaiIndex)")
     }
     func hidePanel() {
@@ -81,6 +96,7 @@ class YabaiClient {
         ) { delegate.onWillFocusSpace($0) }
         defer { NotificationCenter.default.removeObserver(observer) }
         let client = YabaiClient()
+        delegate.cyclingWindowBorder.visible = true
         delegate.captureVisibleThumbnails()
         precondition(events == ["capture-1", "capture-3"])
         delegate.floatingPanel?.isVisible = true
@@ -91,6 +107,8 @@ class YabaiClient {
         precondition(events == ["hide", "focus-2"])
         precondition(delegate.panelManager?.cursorRestorationPolicy == .skip)
         events = []
+        delegate.windowHandlingController.previewVisible = true
+        delegate.cyclingWindowBorder.visible = true
         try client.focusSpace(index: 2)
         precondition(events == ["capture-1", "focus-2"])
         events = []

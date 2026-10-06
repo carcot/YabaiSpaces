@@ -8,6 +8,106 @@
 import AppKit
 import Carbon
 
+final class CapsPrefixController {
+    private var eventTap: CFMachPort?
+    private var source: CFRunLoopSource?
+    private var session = PrefixSession()
+    private var consumedKeys = Set<Int64>()
+    private var timer: Timer?
+    private let handler: (JumpCommand) -> Void
+
+    init(handler: @escaping (JumpCommand) -> Void) { self.handler = handler }
+
+    @discardableResult
+    func install() -> Bool {
+        if eventTap == nil {
+            let mask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue)
+            guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap,
+                                             options: .defaultTap, eventsOfInterest: CGEventMask(mask),
+                                             callback: { _, type, event, context in
+                guard let context = context else { return Unmanaged.passUnretained(event) }
+                return Unmanaged<CapsPrefixController>.fromOpaque(context).takeUnretainedValue()
+                    .handle(type: type, event: event)
+            }, userInfo: Unmanaged.passUnretained(self).toOpaque()) else {
+                NSLog("[YabaiSpaces] Cannot start Caps prefix: event tap unavailable")
+                return false
+            }
+            eventTap = tap
+            source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+            CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+            CGEvent.tapEnable(tap: tap, enable: true)
+        }
+        return true
+    }
+
+    func start() {
+        guard install() else { return }
+        activate()
+    }
+
+    private func activate() {
+        session.start(now: ProcessInfo.processInfo.systemUptime)
+        timer?.invalidate()
+        timer = Timer(timeInterval: PrefixSession.timeout, repeats: false) { [weak self] _ in self?.cancel() }
+        RunLoop.main.add(timer!, forMode: .common)
+        NSLog("[YabaiSpaces] Caps prefix active")
+    }
+
+    func cancel() {
+        session.cancel()
+        timer?.invalidate()
+        timer = nil
+    }
+
+    private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            cancel()
+            consumedKeys.removeAll()
+            if let tap = eventTap { CGEvent.tapEnable(tap: tap, enable: true) }
+            return Unmanaged.passUnretained(event)
+        }
+        let code = event.getIntegerValueField(.keyboardEventKeycode)
+        if consumedKeys.contains(code) {
+            if type == .keyUp { consumedKeys.remove(code) }
+            return nil
+        }
+        let modifiers: CGEventFlags = [.maskCommand, .maskControl, .maskAlternate, .maskShift]
+        if type == .keyDown, code == Int64(kVK_F20), event.flags.intersection(modifiers).isEmpty,
+           event.getIntegerValueField(.keyboardEventAutorepeat) == 0 {
+            activate()
+            consumedKeys.insert(code)
+            return nil
+        }
+        guard type == .keyDown, session.isActive(now: ProcessInfo.processInfo.systemUptime) else {
+            return Unmanaged.passUnretained(event)
+        }
+        if code == 53 || (code == Int64(kVK_ANSI_Period) && event.flags.intersection(modifiers).isEmpty) {
+            cancel()
+            consumedKeys.insert(code)
+            return nil
+        }
+        guard event.flags.intersection(modifiers).isEmpty else { return Unmanaged.passUnretained(event) }
+        guard event.getIntegerValueField(.keyboardEventAutorepeat) == 0,
+              let key = NSEvent(cgEvent: event)?.charactersIgnoringModifiers?.lowercased(),
+              let command = session.select(key, now: ProcessInfo.processInfo.systemUptime) else {
+            return Unmanaged.passUnretained(event)
+        }
+        cancel()
+        consumedKeys.insert(code)
+        DispatchQueue.main.async { [weak self] in self?.handler(command) }
+        return nil
+    }
+
+    deinit {
+        timer?.invalidate()
+        if let tap = eventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
+        }
+        if let source = source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
+    }
+}
+
 // MARK: - Carbon-based Hotkey (for regular keys with modifiers, .immediate trigger)
 
 class CarbonHotkey {

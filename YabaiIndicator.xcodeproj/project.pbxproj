@@ -7,7 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B36F521CE494465393A4B211 /* CapsConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B36F521CE494465393A4B212 /* CapsConfiguration.swift */; };
+		B36F521CE494465393A4B221 /* TOMLDecoder-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = B36F521CE494465393A4B222 /* TOMLDecoder-LICENSE.txt */; };
+		B36F521CE494465393A4B231 /* TOMLDecoder in Frameworks */ = {isa = PBXBuildFile; productRef = B36F521CE494465393A4B232 /* TOMLDecoder */; };
+		B36F521CE494465393A4B1F1 /* WindowHandling.swift in Sources */ = {isa = PBXBuildFile; fileRef = B36F521CE494465393A4B1F2 /* WindowHandling.swift */; };
+		B36F521CE494465393A4B201 /* HyprMac-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = B36F521CE494465393A4B202 /* HyprMac-LICENSE.txt */; };
 		B36F521CE494465393A4B1E1 /* WindowSwitching.swift in Sources */ = {isa = PBXBuildFile; fileRef = B36F521CE494465393A4B1E2 /* WindowSwitching.swift */; };
+		C76F521CE494465393A4B1E1 /* CyclingWindowBorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = C76F521CE494465393A4B1E2 /* CyclingWindowBorder.swift */; };
 		B36F521CE494465393A4B1D1 /* PanelCommandClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B36F521CE494465393A4B1D2 /* PanelCommandClient.swift */; };
 		50HKMGR022779500000E8F192 /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50HKMGR012779500000E8F192 /* HotkeyManager.swift */; };
 		50PMANAGER022779500000E8F192 /* PanelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50PMANAGER012779500000E8F192 /* PanelManager.swift */; };
@@ -59,7 +65,12 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		B36F521CE494465393A4B212 /* CapsConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapsConfiguration.swift; sourceTree = "<group>"; };
+		B36F521CE494465393A4B222 /* TOMLDecoder-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "TOMLDecoder-LICENSE.txt"; sourceTree = "<group>"; };
+		B36F521CE494465393A4B1F2 /* WindowHandling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowHandling.swift; sourceTree = "<group>"; };
+		B36F521CE494465393A4B202 /* HyprMac-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "HyprMac-LICENSE.txt"; sourceTree = "<group>"; };
 		B36F521CE494465393A4B1E2 /* WindowSwitching.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowSwitching.swift; sourceTree = "<group>"; };
+		C76F521CE494465393A4B1E2 /* CyclingWindowBorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CyclingWindowBorder.swift; sourceTree = "<group>"; };
 		B36F521CE494465393A4B1D2 /* PanelCommandClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelCommandClient.swift; sourceTree = "<group>"; };
 		500F41352780826500C6BC9B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		50HKMGR012779500000E8F192 /* HotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManager.swift; sourceTree = "<group>"; };
@@ -108,6 +119,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				506120B4277B44B200E8F192 /* Socket in Frameworks */,
+				B36F521CE494465393A4B231 /* TOMLDecoder in Frameworks */,
 				506120AC277A1A9500E8F192 /* Cocoa.framework in Frameworks */,
 				506120A4277A1A6F00E8F192 /* CoreGraphics.framework in Frameworks */,
 				506120A8277A1A8800E8F192 /* CoreServices.framework in Frameworks */,
@@ -168,6 +180,11 @@
 				5061206B2779212000E8F192 /* YabaiIndicatorApp.swift */,
 				B36F521CE494465393A4B1D2 /* PanelCommandClient.swift */,
 				B36F521CE494465393A4B1E2 /* WindowSwitching.swift */,
+				C76F521CE494465393A4B1E2 /* CyclingWindowBorder.swift */,
+				B36F521CE494465393A4B212 /* CapsConfiguration.swift */,
+				B36F521CE494465393A4B222 /* TOMLDecoder-LICENSE.txt */,
+				B36F521CE494465393A4B1F2 /* WindowHandling.swift */,
+				B36F521CE494465393A4B202 /* HyprMac-LICENSE.txt */,
 				5061206D2779212000E8F192 /* ContentView.swift */,
 				50DF24C6277BD18700DF1906 /* ImageGenerator.swift */,
 				50PL00012779210000E8F192 /* PanelLayout.swift */,
@@ -269,6 +286,7 @@
 			name = YabaiIndicator;
 			packageProductDependencies = (
 				506120B3277B44B200E8F192 /* Socket */,
+				B36F521CE494465393A4B232 /* TOMLDecoder */,
 			);
 			productName = YabaiIndicator;
 			productReference = 506120682779212000E8F192 /* YabaiIndicator.app */;
@@ -345,6 +363,7 @@
 			mainGroup = 5061205F2779212000E8F192;
 			packageReferences = (
 				506120B2277B44B200E8F192 /* XCRemoteSwiftPackageReference "BlueSocket" */,
+				B36F521CE494465393A4B233 /* XCRemoteSwiftPackageReference "TOMLDecoder" */,
 			);
 			productRefGroup = 506120692779212000E8F192 /* Products */;
 			projectDirPath = "";
@@ -364,6 +383,8 @@
 			files = (
 				506120732779212200E8F192 /* Preview Assets.xcassets in Resources */,
 				5051A46B2780DC9B00614C85 /* defaults.plist in Resources */,
+				B36F521CE494465393A4B221 /* TOMLDecoder-LICENSE.txt in Resources */,
+				B36F521CE494465393A4B201 /* HyprMac-LICENSE.txt in Resources */,
 				506120702779212200E8F192 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -406,6 +427,9 @@
 				5061206C2779212000E8F192 /* YabaiIndicatorApp.swift in Sources */,
 				B36F521CE494465393A4B1D1 /* PanelCommandClient.swift in Sources */,
 				B36F521CE494465393A4B1E1 /* WindowSwitching.swift in Sources */,
+				C76F521CE494465393A4B1E1 /* CyclingWindowBorder.swift in Sources */,
+				B36F521CE494465393A4B211 /* CapsConfiguration.swift in Sources */,
+				B36F521CE494465393A4B1F1 /* WindowHandling.swift in Sources */,
 				5086FE842783026C00E51F61 /* ButtonStyle.swift in Sources */,
 					A99146BA8BC740C692ACAA1D /* ButtonImageCache.swift in Sources */,
 				5051A4692780C02700614C85 /* YabaiClient.swift in Sources */,
@@ -582,7 +606,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.1.5;
+				MARKETING_VERSION = 1.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.carcot.YabaiSpaces;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -617,7 +641,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.1.5;
+				MARKETING_VERSION = 1.8.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.carcot.YabaiSpaces;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -744,6 +768,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		B36F521CE494465393A4B233 /* XCRemoteSwiftPackageReference "TOMLDecoder" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/dduan/TOMLDecoder.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.4.5;
+			};
+		};
 		506120B2277B44B200E8F192 /* XCRemoteSwiftPackageReference "BlueSocket" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Kitura/BlueSocket.git";
@@ -755,6 +787,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		B36F521CE494465393A4B232 /* TOMLDecoder */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B36F521CE494465393A4B233 /* XCRemoteSwiftPackageReference "TOMLDecoder" */;
+			productName = TOMLDecoder;
+		};
 		506120B3277B44B200E8F192 /* Socket */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 506120B2277B44B200E8F192 /* XCRemoteSwiftPackageReference "BlueSocket" */;
