@@ -43,6 +43,7 @@ class PanelManager: NSObject {
         )
         panel.level = .floating
         panel.isFloatingPanel = true
+        panel.animationBehavior = .none
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = true

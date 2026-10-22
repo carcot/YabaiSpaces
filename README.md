@@ -20,9 +20,13 @@ Customizable panel layout and display options
 
 </div>
 
-## Current version: 1.8.0
+## Current version: 1.10.0
 
 This README describes the current source and locally installed `/Applications/YabaiSpaces.app`, including the existing keyboard setup checked on October 6, 2026. Published release DMGs may lag these changes; check the installed version and `--help` rather than assuming an older download supports every command below.
+
+The [universal 1.10.0 DMG](YabaiSpaces-1.10.0-Universal.dmg) includes fresh departure-time thumbnails and Space-only thumbnail clicks. Its exact app is installed locally. Verify the [SHA-256 checksum](YabaiSpaces-1.10.0-Universal.dmg.sha256) and read the [1.10.0 release notes](docs/RELEASE_1.10.0.md). Use [GitHub Releases](https://github.com/carcot/YabaiSpaces/releases) for published downloads and check the release's actual version, not just this README's heading. The retained 1.8.0 DMG is historical and predates these fixes.
+
+**Distribution warning:** the current local app and 1.10.0 package are **Apple Development signed, not Developer ID signed/notarized for public distribution**. Launching successfully on the development Mac does not establish Gatekeeper acceptance elsewhere. See [installation and Gatekeeper guidance](docs/INSTALLATION.md#signing-and-gatekeeper) before installing a downloaded build.
 
 ## Features
 
@@ -191,20 +195,47 @@ Exit 0 usually means work was queued, not that focus/movement completed. Excepti
 
 ## Thumbnail Capture
 
-YabaiSpaces captures visible desktops before opening the panel, then keeps those clean snapshots when you choose a destination. Reopening or repositioning an already-visible panel does not overwrite them with a screenshot containing the panel. YS switches without the panel (including recent-Space and cross-Space window/application commands) capture the outgoing desktop synchronously before focusing the destination. Spaces without a captured thumbnail show wallpaper plus window outlines.
+YabaiSpaces captures visible desktops before opening the panel for the initial preview. When you choose a destination, it hides the panel and captures the outgoing desktop again, synchronously **immediately before leaving**, rather than retaining the earlier opening snapshot. Capture explicitly excludes YS window IDs so a panel waiting for the display compositor to disappear cannot enter the image. Reopening/repositioning an already-visible panel does not capture it. YS switches without the panel (including recent-Space and cross-Space window/application commands) also capture immediately before departure. Spaces without a captured thumbnail show wallpaper plus window outlines.
 
-External switches that bypass YS, such as Mission Control gestures or direct yabai commands, do not trigger a pre-departure capture. Panel snapshots represent the moment just before the panel opened; they do not refresh while it remains visible.
+External switches that bypass YS, such as Mission Control gestures or direct yabai commands, still do not trigger a pre-departure capture. Visible panel previews are not a live video feed, but the saved outgoing thumbnail is refreshed at departure. A failed clean capture preserves the last cached image instead of using a panel-contaminated fallback. See [capture timing and verification](EXTERNAL_SWITCH_CAPTURE_NOTES.md).
 
 ## Requirements and installation
 
-- macOS with a running [yabai](https://github.com/asmvik/yabai) daemon. This integration has been verified locally with yabai 7.1.25; that is a tested version, not a claim of compatibility with every older release.
-- Accessibility/input-monitoring authorization as required for yabai, YS event taps/window controls, and your shortcut tools; Screen Recording authorization for real desktop thumbnails.
+- macOS with a running [yabai](https://github.com/asmvik/yabai) daemon. The tested baseline is yabai **7.1.25**, Apple Silicon, macOS **26.6.2**, with **SIP enabled**; this is not a guarantee for every macOS release or Intel Mac.
+- Accessibility/input-monitoring authorization as required for yabai, YS event taps/window controls, and your shortcut tools; Screen Recording authorization for real desktop thumbnails. Each tool needs its own applicable permissions.
 - skhd/Karabiner are needed for this machine's physical tap mappings, not for basic menu/panel use or direct native commands.
-- Xcode and the project's Swift packages for source builds.
+- Xcode and the project's Swift packages for source builds only; neither Xcode nor Python is required to run a downloaded app.
 
-SIP is not a blanket YS installation requirement: this setup's Space switching has been verified with SIP enabled. Features requiring yabai's Dock scripting addition have their own SIP requirements; consult [yabai's SIP documentation](https://github.com/asmvik/yabai/wiki/Disabling-System-Integrity-Protection) instead of disabling SIP simply to install YS. Source integration and macOS/private-API compatibility can vary by version.
+### Fresh installation
 
-Published builds are available from [Releases](https://github.com/carcot/YabaiSpaces/releases), but may not contain the current source features. For the current build, use `/Applications/YabaiSpaces.app`; avoid stale repository bundles or permanent launches from temporary build directories. Never run two GUI copies sharing the same socket. Match the app's signing identity and preserve its working backup/permissions when replacing it.
+1. Install yabai using [its upstream instructions](https://github.com/asmvik/yabai/wiki/Installing-yabai-(latest-release)). With Homebrew, install and start it:
+
+   ```sh
+   brew install asmvik/formulae/yabai
+   yabai --start-service
+   ```
+
+   Grant **yabai** Accessibility access and confirm `yabai -m query --spaces` succeeds. Preserve existing `~/.yabairc` settings; no scripting addition or SIP change is needed just for YS's basic navigation.
+2. Download an actually published DMG and its checksum from [Releases](https://github.com/carcot/YabaiSpaces/releases). Verify the checksum, open the DMG, and drag **YabaiSpaces.app** to **Applications**. For upgrades, quit YS and preserve a verified backup before cleanly replacing the old bundle, rather than merging bundles.
+3. Launch **`/Applications/YabaiSpaces.app`**. Grant YS the applicable **Accessibility/Input Monitoring** access for input handling and **Screen Recording** (called **Screen & System Audio Recording** on newer macOS) for screenshots. Restart the affected app if macOS requests it. Follow the signing warning above if Gatekeeper blocks first launch; do not disable system protections.
+4. For actual screenshots, open **Preferences → Button Style → Thumbnail**. The default **Windows** mode shows wallpaper/window outlines, not screenshots. This style setting is shared by the menu bar and panel. Open the panel once for an initial capture; later YS departures refresh the outgoing image immediately before switching.
+5. Optionally configure the [skhd/Karabiner shortcuts](#keyboard-setup-and-skhd). YS does not install this machine's personal mappings for you. Basic menu/panel use and Hyper-Space work without those mappings.
+
+The [installation guide](docs/INSTALLATION.md) covers permission ownership, checksums, upgrades/rollback, outline fallbacks, and troubleshooting. Avoid stale repository app bundles and permanent launches from temporary build directories; never run two GUI copies sharing the same socket.
+
+### SIP-enabled switching and no-animation support
+
+**You do not need to disable SIP just to obtain fast Space switching with current yabai.** Since **7.1.19**, `yabai -m space --focus` works with SIP enabled, using a gesture-based route that bypasses the normal visible slide rather than requiring the Dock scripting addition. See the [upstream implementation discussion](https://github.com/asmvik/yabai/issues/2780). This is not a promise of zero input latency or control over every Mission Control gesture.
+
+For switches caused by focusing an application/window on another Space (such as Command-Tab or Dock selection), **7.1.22** added `skip_window_focus_animation`, improved in **7.1.23**. See [yabai's version history](https://github.com/asmvik/yabai/blob/v7.1.25/CHANGELOG.md). **Only if you are not using the scripting addition**, apply this optional setting and add the same line to your existing `~/.yabairc` for future startups:
+
+```sh
+yabai -m config skip_window_focus_animation on
+```
+
+The [manual](https://github.com/asmvik/yabai/blob/v7.1.25/doc/yabai.asciidoc) says not to enable it alongside the scripting addition, which already handles that case. `window_animation_duration 0` controls **window move/resize frame animation**, not Space transitions. Moving windows between Spaces works with SIP enabled again in **7.1.25**; creating/reordering Spaces and other scripting-addition features still have separate [SIP requirements](https://github.com/asmvik/yabai/wiki/Disabling-System-Integrity-Protection).
+
+Local read-only verification on October 22, 2026 found SIP **enabled**, `skip_window_focus_animation` **off**, and `window_animation_duration` **0.0**. The optional setting above has not been applied by this documentation update. Private-API/macOS compatibility remains version-dependent.
 
 ### Yabai signals
 
@@ -222,7 +253,7 @@ yabai -m signal --add event=window_minimized action='echo "refresh windows" | nc
 yabai -m signal --add event=window_deminimized action='echo "refresh windows" | nc -U /tmp/yabai-indicator.socket'
 ```
 
-YS 1.8.0 installs and verifies these labeled tracking actions after its socket starts; they are also recorded in this machine's persistent `.yabairc`:
+YS 1.8.0 and later install and verify these labeled tracking actions after the socket starts; they are also recorded in this machine's persistent `.yabairc`:
 
 ```sh
 yabai -m signal --add label=ys-focus-window event=window_focused action='/Applications/YabaiSpaces.app/Contents/MacOS/YabaiIndicator event window-focused "$YABAI_WINDOW_ID"'
@@ -246,22 +277,26 @@ Open **Preferences** from the menu-bar/context menu or by right-clicking the pan
 
 **Menu-bar options:** Show/Hide Menu Bar, Show Display Separator, Show Current Space Only, and Numeric/Windows/Thumbnail button styles.
 
+**Button Style is shared by the menu bar and panel:** **Numeric** shows labels, **Windows** (the default) shows wallpaper/window outlines, and **Thumbnail** shows cached desktop screenshots where available. Windows mode never displays the screenshot cache; seeing only wallpaper there is not a stale-thumbnail bug. In Thumbnail mode, uncaptured Spaces still fall back to outlines. Captures are in memory, reset on restart, and are not a live feed. YS-controlled departures refresh them just before leaving; external switches do not have that hook. See [first-run previews](docs/INSTALLATION.md#choose-real-thumbnails).
+
 **Panel options:** Show/Hide Spaces Grid; centered/at-cursor placement; cursor on active thumbnail/centered/stay-put; cursor restoration; 1–12 columns/rows.
 
 When the panel is visible:
 - **Arrow keys** move between Spaces with wraparound.
 - **Enter/Space** activates the selected Space.
 - **Escape** closes without selecting.
-- **Click** activates a Space; **right-click** opens the context menu.
+- **Click** anywhere on a thumbnail activates its Space, without choosing a window based on click position; **right-click** opens the context menu. The former hit-testing code is retained in comments, not active.
 - **Scroll/swipe** closes the panel.
 - A **Right-Shift tap** confirms selection through skhd rather than merely toggling the panel closed.
 
 The menu also exposes **Window controls**, **Edit Caps bindings…**, and **Reload Caps bindings**.
 
-## Changes leading to 1.8.0
+## Changes leading to 1.10.0
 
 | Version/update | Changes |
 | --- | --- |
+| 1.10.0 | Thumbnail clicks only switch Spaces; old coordinate-based window selection and drag handler are commented out and retained |
+| 1.9.0 | Fresh outgoing capture after panel dismissal, immediately before departure; explicit YS-window exclusion and a real-pixel timing regression |
 | 1.8.0 | ID-bearing focus/destroy signals, bounded diagnostics, asynchronous intake/query/navigation workers, live reconciliation, registration repair, and explicit ordering/source limitations |
 | 1.7.0 | Border thins to timeout with its inner edge always adjacent to the window |
 | 1.6.0 | Manual-focus cycling/history correction, automatic expiry, temporary border, Caps-period removal, and release of global Command-L |
@@ -276,9 +311,13 @@ Detailed root causes, historical deployments, and verification are in [SESSION_L
 
 ## Development and verification
 
+The packaged **1.10.0** build passed **53 tests with no skips in 85.362 seconds**, including a guard that thumbnail clicks only switch Spaces and the old hit-testing code remains commented out. A clean signed universal Release build was installed with verified backup/signature/contents, then restarted and checked through native command handling and two actual panel open/close cycles. The mounted DMG matched the build; its signature, version, both architectures, Applications shortcut, and checksum were verified. Physical click/Space-selection and multi-display verification remain separate.
+
+The earlier **1.9.0** fix passed **52 tests**, including eight real-pixel departure checks with changed desktop content and a contrasting panel, plus checked filtering of invalid/oversized AppKit window numbers. These capture regressions remain in the 1.10.0 suite; departure timing is unchanged.
+
 The 1.8.0 runtime release passed **45 tests**, an explicit clean signed Xcode build, verified backup/install/restart, and coordinated live focus/history/cycling/expiry checks with original foreground restoration. This does not establish every physical keyboard, mouse-drag, dialog, or multi-monitor scenario; see the feature documents for coverage and limits.
 
-Release packaging adds **five tests** for **50 total automated tests**. The new [universal 1.8.0 DMG](YabaiSpaces-1.8.0-Universal.dmg) contains `YabaiSpaces.app` and an Applications shortcut; verify it with the [SHA-256 checksum](YabaiSpaces-1.8.0-Universal.dmg.sha256). See [1.8.0 release notes](docs/RELEASE_1.8.0.md) for the accumulated changes and distribution limits.
+The earlier 1.8.0 packaging added five tests, for 50 at that version. Its [universal 1.8.0 DMG](YabaiSpaces-1.8.0-Universal.dmg) contains `YabaiSpaces.app` and an Applications shortcut; verify it with the [SHA-256 checksum](YabaiSpaces-1.8.0-Universal.dmg.sha256). See [1.8.0 release notes](docs/RELEASE_1.8.0.md) for that package's changes and distribution limits; it does not include the 1.9.0 fix.
 
 ```sh
 python3 -m unittest test_caps_configuration test_native_commands test_panel_commands test_window_switching test_caps_prefix test_window_handling test_thumbnail_capture test_merge_regressions test_run test_cycling_border test_focus_tracking test_build_dmg

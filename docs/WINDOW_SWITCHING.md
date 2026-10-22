@@ -2,6 +2,14 @@
 
 Version 1.8.0 adds [ID-bearing focus tracking](FOCUS_TRACKING.md): raw signal events are retained separately from eligible-window MRU, with asynchronous query/command workers, guarded live reconciliation, and a one-second safety check. `YabaiSpaces focus status` exposes bounded diagnostics. Receipt order is not guaranteed chronological order; reconciliation repairs current focus but cannot reconstruct missed intermediate changes. YS's own windows and dialogs remain outside navigation targets. Cycling still freezes candidates for two seconds and ends on a confirmed external focus change.
 
+## SIP-enabled transitions
+
+Current yabai can focus Spaces without the Dock scripting addition or disabling SIP. Direct Space focus and switches caused indirectly by application/window focus have different animation paths; `window_animation_duration` is not the Space-transition control. See the [README's versioned no-animation guidance](../README.md#sip-enabled-switching-and-no-animation-support) before enabling `skip_window_focus_animation`, which is only for setups without the scripting addition. The documentation update did not enable it locally. [Installation and permissions](INSTALLATION.md) are separate from YS's MRU/cycling policies below.
+
+## Thumbnail clicks — 1.10.0
+
+Clicking anywhere on a thumbnail switches to its Space without selecting a window based on the click position. The previous `findWindowAt` implementation and coordinate-based drag/click handler remain in block comments in `ContentView.swift`, at the user's request. The active handler is a plain tap calling `switchSpace()` without a target window ID. Destination focus is left to normal yabai/macOS Space switching; this does not add a new MRU-selection policy for panel clicks. Native MRU commands, keyboard selection, focus-history updates, and departure-time thumbnail capture are unchanged.
+
 ## Thinning border — 1.7.0
 
 The cycling border starts at up to three points and thins linearly with the remaining two-second deadline, reaching zero at expiry. Repeated cycling renews the deadline and restores the corresponding thickness. Refreshes of the same deadline do not restart the countdown.
@@ -61,7 +69,7 @@ YS owns a new in-memory focus history, updated through the existing yabai window
 
 Hammerspoon's former Command-L/period cycling modes froze MRU reordering and reset their two-second timeout on repeated presses. The native engine freezes candidate order, extends the deadline on every command with a target, and promotes the final observed focus when the interval expires. The old Command double-tap prefix path did not freeze history; its behavior was not identical. As of 1.6.0, expiration uses a timer and external focus changes end cycling immediately. Changing application/window mode or in-Space scope starts a new cycle. Direction changes keep the same cycle. Closed/ineligible windows are pruned; newly discovered windows enter the next cycle. Failure ends the cycle.
 
-Panel selection explicitly ends the active cycle instead of waiting for the timeout, including confirmation of the already-active Space. Cancellation and history observation run on the controller's serial queue without blocking the main thread. Subsequent focus events promote the destination window normally, and the panel switch also requests a fresh observation after its delayed window-focus step. Opening, moving the selection within, or dismissing the panel without selecting does not itself end cycling.
+Panel selection explicitly ends the active cycle instead of waiting for the timeout, including confirmation of the already-active Space. Cancellation and history observation run on the controller's serial queue without blocking the main thread. Subsequent focus events promote the destination window normally, and the panel switch also requests a fresh observation after its delayed Space-model refresh. Thumbnail clicks no longer request a location-selected window-focus step. Opening, moving the selection within, or dismissing the panel without selecting does not itself end cycling.
 
 `space next-recent` derives its candidates from the frozen window history, retaining only the first eligible window per Space. It cycles those representative windows with wraparound, restoring each Space's most recently focused eligible window. For history A1, B1, A2, C1, the cycle is A1 → B1 → C1 → A1; duplicate Space entries cannot trap traversal. This remains window history, not an independent Space history; empty Spaces do not participate.
 

@@ -1,14 +1,32 @@
 # External Switch Thumbnail Capture - Implementation Notes
 
-## Current behavior (2026-09-17)
+## Required thumbnail timing contract
+
+**Standing user requirement, reaffirmed October 22, 2026: the saved thumbnail shows the outgoing desktop as it looked immediately before leaving, never merely as it looked when selected/entered.** This is a behavioral requirement, not an implementation preference; do not change it without explicit user approval.
+
+Acceptance criteria for every YS-controlled Space departure:
+
+1. Capture fresh outgoing content and finish saving it before changing Spaces/focus. An arrival capture, periodic earlier capture, or panel-opening preview is not a substitute.
+2. Panel navigation must also refresh at departure. If content changes after arrival or while the panel is open, the saved thumbnail must contain the later content.
+3. The panel, cycling border, and YS previews must not enter the image. Pre-panel previews are allowed; departure capture must hide/exclude overlays without assuming that `orderOut` has completed display composition.
+4. Associate the capture with the actual outgoing Space/display, never the destination. On capture failure, preserve the last clean cached image rather than save contaminated/mislabeled pixels. An unavailable fresh capture is a limitation, not permission to redefine the timing requirement.
+5. Changing capture APIs, caching, or navigation must preserve these criteria and the regression coverage. The mechanism may change; the required behavior may not silently change with it.
+
+`test_capture_and_switch_ordering` verifies changed content is captured before focus; `test_departure_pixels_are_fresh_after_real_panel_hide` verifies real changed pixels and panel exclusion; `test_capture_ignores_unrepresentable_window_numbers` protects exclusion collection from AppKit ID conversion crashes. These tests are in `test_thumbnail_capture.py`. Run them for related runtime changes; skipped pixel verification must be reported, not presented as a pass. The current inability to intercept external Mission Control/direct-yabai departures is documented below and must not be confused with compliant YS-controlled navigation.
+
+## Current behavior (2026-10-22, 1.9.0)
 
 All YS `YabaiClient.focusSpace` calls post a synchronous pre-focus notification. The app handles capture on the main thread before the command is sent, including when the caller is the background MRU controller. Fresh native Space state identifies the outgoing visible desktop; the asynchronously refreshed UI model is not used. On multiple displays, capture includes the active desktop and the visible desktop on the destination display. Capture uses the display's actual CoreGraphics ID.
 
-Before opening the panel, capture every visible desktop. While the panel is visible, retain those pre-panel snapshots and hide the panel before switching; never recapture the panel into them. Repeated show/reposition commands also skip capture while visible. A panel snapshot can therefore predate changes made underneath an open panel. Without the panel, capture happens immediately before departure.
+Before opening the panel, capture every visible desktop for the initial preview. Repeated show/reposition commands skip capture while visible. On an actual YS-controlled departure, hide the panel without cursor restoration and then capture the outgoing visible desktop again, immediately before focus changes. This replaces the early opening snapshot with current content, including changes underneath an open panel. Without the panel, capture still happens immediately before departure. No-op/invalid destinations do not hide or recapture; failed focus attempts have already captured the outgoing desktop.
+
+Hiding a panel is not a screenshot barrier: a real-pixel regression reproduced a blue panel in `CGDisplayCreateImage` after `orderOut`, even with animation disabled. Departure capture therefore explicitly excludes all YS window IDs. The existing dynamically loaded CoreGraphics path now also resolves `CGWindowListCreateImageFromArray`, composes the front-to-back on-screen window list minus those IDs, and uses the display's full bounds, including nonzero origins. Desktop/Finder elements are retained; this is not a synthetic window-outline rendering. The no-exclusion path retains full-display capture. If clean composition is unavailable, return no image rather than fall back to a panel-contaminated screenshot; the last cached thumbnail remains unchanged. Screenshot API availability/Screen Recording authorization still limit capture.
 
 This covers panel selections, menubar buttons, recent-Space commands and cross-Space window/application commands routed through YS. Trackpad/Mission Control switches and direct external yabai commands still bypass this hook. A post-switch notification cannot recover the previous display's last pixels, even if the previous Space ID is known; do not capture the new desktop under the old ID.
 
-Regression verification: `python3 -m unittest test_thumbnail_capture test_window_switching test_merge_regressions`. The thumbnail harness executes the production preparation and focus methods against fake displays/panels/socket calls, including background-to-main synchronization. Actual screenshot contents require live visual verification.
+Regression verification: `python3 -m unittest test_thumbnail_capture test_window_switching test_merge_regressions`. The ordering harness executes production preparation/focus methods against fake displays/panels/socket calls, including background-to-main synchronization and content changes between opening and departure. A second test compiles the production capture implementation and preparation/panel-hide methods, shows a nonactivating blue test panel over a red-to-green content change, and verifies eight departures capture green rather than the early red frame or blue panel. It skips without requesting permission if Screen Recording is not already authorized. This pixel test passed outside the sandbox; physical shortcut/multi-display validation remains separate.
+
+Window-ID safety follow-up: AppKit can report positive window numbers outside CoreGraphics' 32-bit range. Exclusion collection uses checked `CGWindowID(exactly:)` conversion and ignores invalid values rather than trapping. A compiled production-caller regression covers negative/zero values, normal IDs, the 32-bit maximum, and oversized values. Final full suite: 52 tests passed, with two actual installed-panel open/close cycles also verified. The historical experiments below do not describe this fix.
 
 ## Historical behavior and experiments (superseded)
 

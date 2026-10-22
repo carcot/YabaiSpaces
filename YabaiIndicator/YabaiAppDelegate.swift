@@ -140,7 +140,11 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         let baseHeight: CGFloat = 20 * panelLayout.scale
         let aspect = display.frame.width / display.frame.height
         let targetSize = CGSize(width: baseHeight * aspect, height: baseHeight)
-        if let data = gPrivateWindowCapture.captureSpace(display: display, targetSize: targetSize) {
+        let excludedWindows = Set(NSApp.windows.compactMap { window -> CGWindowID? in
+            window.windowNumber > 0 ? CGWindowID(exactly: window.windowNumber) : nil
+        })
+        if let data = gPrivateWindowCapture.captureSpace(display: display, targetSize: targetSize,
+                                                        excludingWindowIDs: excludedWindows) {
             gThumbnailCache.set(spaceId: space.spaceid, data: data)
         }
     }
@@ -158,14 +162,12 @@ class YabaiAppDelegate: NSObject, NSApplicationDelegate, PanelHotkeyDelegate {
         cyclingWindowBorder.hide()
         let spaces = gNativeClient.querySpaces()
         guard let target = spaces.first(where: { $0.yabaiIndex == index }), !target.active else { return }
-        if floatingPanel?.isVisible != true {
-            for space in spaces where space.visible && (space.active || space.display == target.display) {
-                captureThumbnail(for: space)
-            }
-        }
         if floatingPanel?.isVisible == true {
             panelManager?.cursorRestorationPolicy = .skip
             hidePanel()
+        }
+        for space in spaces where space.visible && (space.active || space.display == target.display) {
+            captureThumbnail(for: space)
         }
     }
 

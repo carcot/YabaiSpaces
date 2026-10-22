@@ -112,6 +112,7 @@ struct ThumbnailSpaceButton : View {
         }
     }
 
+    /*
     // Find which window was clicked at the given position (in thumbnail coordinates)
     func findWindowAt(position: CGPoint, thumbnailSize: CGSize, displayIndex: Int) -> UInt64? {
         guard displayIndex >= 0 else { return nil }
@@ -162,6 +163,7 @@ struct ThumbnailSpaceButton : View {
 
         return nil
     }
+    */
 
     var body: some View {
         switch space.type {
@@ -220,6 +222,7 @@ struct ThumbnailSpaceButton : View {
                     loadThumbnail(for: space, display: display, windows: windows, size: targetSize)
                 }
                 .frame(width: targetSize.width, height: targetSize.height)
+                /*
                 .gesture(
                     DragGesture(minimumDistance: 0, coordinateSpace: .local)
                         .onEnded { value in
@@ -227,6 +230,8 @@ struct ThumbnailSpaceButton : View {
                             switchSpace(focusWindowId: windowId)
                         }
                 )
+                */
+                .onTapGesture { switchSpace() }
             } else {
                 // Fallback: use first available display or minimal frame for numeric style
                 let fallbackDisplay = displays.first ?? Display(id: 0, uuid: "", index: 0, frame: NSRect(x: 0, y: 0, width: 1920, height: 1080))

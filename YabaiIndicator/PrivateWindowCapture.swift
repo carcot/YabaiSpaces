@@ -26,6 +26,7 @@ class PrivateWindowCapture {
     // Private API function pointers
     private var cgWindowListCreateImage: CGWindowListCreateImageFn?
     private var cgWindowListCreateImageFromRect: CGWindowListCreateImageFromRectFn?
+    private var cgWindowListCreateImageFromArray: CGWindowListCreateImageFn?
 
     init() {
         loadPrivateAPIs()
@@ -34,6 +35,9 @@ class PrivateWindowCapture {
     private func loadPrivateAPIs() {
         // Try CoreGraphics framework
         if let handle = dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", RTLD_LAZY) {
+            if let symbol = dlsym(handle, "CGWindowListCreateImageFromArray") {
+                cgWindowListCreateImageFromArray = unsafeBitCast(symbol, to: CGWindowListCreateImageFn.self)
+            }
             // Try various possible function names
             let functionNames = [
                 "CGWindowListCreateImage",
@@ -235,10 +239,25 @@ class PrivateWindowCapture {
         return nil
     }
 
-    func captureSpace(display: Display, targetSize: CGSize) -> Data? {
+    func captureSpace(display: Display, targetSize: CGSize, excludingWindowIDs: Set<CGWindowID> = []) -> Data? {
         return captureQueue.sync {
             let displayID = CGDirectDisplayID(display.id)
-            guard let displayImage = CGDisplayCreateImage(displayID),
+            let displayImage: CGImage?
+            if excludingWindowIDs.isEmpty {
+                displayImage = CGDisplayCreateImage(displayID)
+            } else {
+                guard let createImage = cgWindowListCreateImageFromArray,
+                      let records = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID)
+                        as? [[String: Any]],
+                      let windows = CFArrayCreateMutable(nil, 0, nil) else { return nil }
+                for record in records {
+                    guard let identifier = (record[kCGWindowNumber as String] as? NSNumber)?.uint32Value,
+                          identifier > 0, !excludingWindowIDs.contains(identifier) else { continue }
+                    CFArrayAppendValue(windows, UnsafeRawPointer(bitPattern: UInt(identifier)))
+                }
+                displayImage = createImage(CGDisplayBounds(displayID), windows, 0)
+            }
+            guard let displayImage,
                   let scaledImage = scaleImage(displayImage, to: targetSize) else {
                 return nil
             }
