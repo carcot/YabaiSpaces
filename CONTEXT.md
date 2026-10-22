@@ -4,9 +4,9 @@
 macOS menu bar app that displays clickable space indicators. Integrates with Yabai for space switching.
 
 ## Current State
-- **Version:** 1.10.0 installed locally and packaged as a verified universal DMG with SHA-256 checksum. The retained 1.8.0 DMG is historical. See `SESSION_LOG.md` for GitHub publication status.
+- **Version:** 1.10.0 installed locally and [published on GitHub](https://github.com/carcot/YabaiSpaces/releases/tag/v1.10.0) as the latest release with verified universal DMG and SHA-256 checksum. The retained 1.8.0 DMG is historical. See `SESSION_LOG.md` for publication verification.
 - **Status:** Exact packaged Release app verified and installed locally; 53 automated tests pass with no skips, including Space-only thumbnail clicks and departure-capture regressions. Actual panel open/close verified; broader physical-input/multi-monitor coverage remains limited.
-- **Last work:** October 22, 2026 - clean universal 1.10.0 package, verified backup/install/restart, current installation guide and release notes; GitHub publishing uses the authorized `carcot` account
+- **Last work:** October 22, 2026 - pushed 1.10.0 source/package/docs and published the latest release through the authorized `carcot` account; re-downloaded assets match local files, and the installed app remains healthy
 
 ## Key Files to Know
 | File | Purpose |

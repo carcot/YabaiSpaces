@@ -26,6 +26,8 @@ This README describes the current source and locally installed `/Applications/Ya
 
 The [universal 1.10.0 DMG](YabaiSpaces-1.10.0-Universal.dmg) includes fresh departure-time thumbnails and Space-only thumbnail clicks. Its exact app is installed locally. Verify the [SHA-256 checksum](YabaiSpaces-1.10.0-Universal.dmg.sha256) and read the [1.10.0 release notes](docs/RELEASE_1.10.0.md). Use [GitHub Releases](https://github.com/carcot/YabaiSpaces/releases) for published downloads and check the release's actual version, not just this README's heading. The retained 1.8.0 DMG is historical and predates these fixes.
 
+**Published:** [YabaiSpaces 1.10.0](https://github.com/carcot/YabaiSpaces/releases/tag/v1.10.0) — [download universal DMG](https://github.com/carcot/YabaiSpaces/releases/download/v1.10.0/YabaiSpaces-1.10.0-Universal.dmg) and [checksum](https://github.com/carcot/YabaiSpaces/releases/download/v1.10.0/YabaiSpaces-1.10.0-Universal.dmg.sha256). Both published assets were downloaded again and byte-compared with the verified local files.
+
 **Distribution warning:** the current local app and 1.10.0 package are **Apple Development signed, not Developer ID signed/notarized for public distribution**. Launching successfully on the development Mac does not establish Gatekeeper acceptance elsewhere. See [installation and Gatekeeper guidance](docs/INSTALLATION.md#signing-and-gatekeeper) before installing a downloaded build.
 
 ## Features

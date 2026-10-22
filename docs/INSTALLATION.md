@@ -1,6 +1,6 @@
 # Installing and upgrading YabaiSpaces
 
-This guide describes YS **1.10.0**, including the verified [universal DMG](../YabaiSpaces-1.10.0-Universal.dmg) and its [checksum](../YabaiSpaces-1.10.0-Universal.dmg.sha256). That exact packaged app is installed locally. The retained 1.8.0 package is historical and lacks the departure-capture and Space-only thumbnail-click fixes. Download assets listed on [GitHub Releases](https://github.com/carcot/YabaiSpaces/releases), and read the [1.10.0 release notes](RELEASE_1.10.0.md) and distribution limits. A source version, local app, checked-in DMG, and published release are different things; publication status is recorded in the session log.
+This guide describes the published [YS 1.10.0 release](https://github.com/carcot/YabaiSpaces/releases/tag/v1.10.0), including the verified [universal DMG](https://github.com/carcot/YabaiSpaces/releases/download/v1.10.0/YabaiSpaces-1.10.0-Universal.dmg) and its [checksum](https://github.com/carcot/YabaiSpaces/releases/download/v1.10.0/YabaiSpaces-1.10.0-Universal.dmg.sha256). That exact packaged app is installed locally, and downloaded release assets were verified against the local files. The retained 1.8.0 package is historical and lacks the departure-capture and Space-only thumbnail-click fixes. Read the [1.10.0 release notes](RELEASE_1.10.0.md) and distribution limits; publication verification is recorded in the session log.
 
 ## Signing and Gatekeeper
 
