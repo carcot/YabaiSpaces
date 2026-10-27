@@ -1,10 +1,12 @@
 # Installing and upgrading YabaiSpaces
 
-This guide describes the published [YS 1.10.0 release](https://github.com/carcot/YabaiSpaces/releases/tag/v1.10.0), including the verified [universal DMG](https://github.com/carcot/YabaiSpaces/releases/download/v1.10.0/YabaiSpaces-1.10.0-Universal.dmg) and its [checksum](https://github.com/carcot/YabaiSpaces/releases/download/v1.10.0/YabaiSpaces-1.10.0-Universal.dmg.sha256). That exact packaged app is installed locally, and downloaded release assets were verified against the local files. The retained 1.8.0 package is historical and lacks the departure-capture and Space-only thumbnail-click fixes. Read the [1.10.0 release notes](RELEASE_1.10.0.md) and distribution limits; publication verification is recorded in the session log.
+Use **1.12.0** for the capture-memory fix and shared screenshot service. **1.10.0 has a severe screenshot-capture memory leak** and is historical, not the corrected download. The local 1.11.0 fix was not packaged separately; 1.12.0 includes it. See the [memory investigation](../MEMORY_LEAK_FIX.md) and [shared service](CAPTURE_SERVICE.md).
+
+The [1.12.0 universal DMG](../YabaiSpaces-1.12.0-Universal.dmg) and [checksum](../YabaiSpaces-1.12.0-Universal.dmg.sha256) match the verified installed app. Get published downloads from [GitHub Releases](https://github.com/carcot/YabaiSpaces/releases), read the [1.12.0 release notes](RELEASE_1.12.0.md), and check publication verification in the session log. The retained 1.8.0 package also predates subsequent thumbnail fixes.
 
 ## Signing and Gatekeeper
 
-**The current local app and 1.10.0 DMG use Apple Development signing, not notarized Developer ID distribution signing.** Successful local signature/launch checks do not establish Gatekeeper acceptance on another Mac. Public distribution signing/notarization remains separate work.
+**The current local app and 1.12.0 DMG use Apple Development signing, not notarized Developer ID distribution signing.** Successful local signature/launch checks do not establish Gatekeeper acceptance on another Mac. Public distribution signing/notarization remains separate work.
 
 For a downloaded build you independently trust, follow [Apple's first-launch guidance](https://support.apple.com/en-us/102445). After an attempted launch, macOS may offer **System Settings → Privacy & Security → Open Anyway** for the relevant unverified-developer/notarization warning. Do not bypass malware/damaged-app warnings indiscriminately. Do not disable Gatekeeper/SIP or recursively remove quarantine as an installation step. A matching checksum detects a download mismatch; it does not establish that the publisher or software is trustworthy.
 
@@ -31,10 +33,10 @@ YS does not enable automatic tiling during installation. Existing yabai layouts 
 ## Install the app
 
 1. Get the DMG and matching SHA-256 file from the same published release. Check the release version before expecting current-source features.
-2. In Terminal, change to the download directory and verify the checksum. For 1.10.0:
+2. In Terminal, change to the download directory and verify the checksum. For 1.12.0:
 
    ```sh
-   shasum -a 256 -c YabaiSpaces-1.10.0-Universal.dmg.sha256
+   shasum -a 256 -c YabaiSpaces-1.12.0-Universal.dmg.sha256
    ```
 
    For another release, use its actual checksum filename instead. Stop if verification fails or the listed DMG is missing.

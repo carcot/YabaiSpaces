@@ -4,9 +4,9 @@
 macOS menu bar app that displays clickable space indicators. Integrates with Yabai for space switching.
 
 ## Current State
-- **Version:** 1.10.0 installed locally and [published on GitHub](https://github.com/carcot/YabaiSpaces/releases/tag/v1.10.0) as the latest release with verified universal DMG and SHA-256 checksum. The retained 1.8.0 DMG is historical. See `SESSION_LOG.md` for publication verification.
-- **Status:** Exact packaged Release app verified and installed locally; 53 automated tests pass with no skips, including Space-only thumbnail clicks and departure-capture regressions. Actual panel open/close verified; broader physical-input/multi-monitor coverage remains limited.
-- **Last work:** October 22, 2026 - pushed 1.10.0 source/package/docs and published the latest release through the authorized `carcot` account; re-downloaded assets match local files, and the installed app remains healthy
+- **Version:** 1.12.0 installed locally and packaged as a verified universal DMG, including the memory fix and shared capture service. See `SESSION_LOG.md` for GitHub publication status. Historical 1.10.0 has the capture leak.
+- **Status:** Exact packaged clean signed universal Release app verified and installed/restarted; 56 tests pass with no skips. Both backends' footprint tests and actual pixel/timing tests pass. Forty panel cycles after warm-up stayed near 20 MiB; multi-day soak remains unverified.
+- **Last work:** October 27, 2026 - implemented private screenshot backends behind one ownership/scaling/PNG service, removed dormant capture paths, expanded lifetime/failure/backend tests, and prepared 1.12.0 publication
 
 ## Key Files to Know
 | File | Purpose |
@@ -14,6 +14,7 @@ macOS menu bar app that displays clickable space indicators. Integrates with Yab
 | `YabaiAppDelegate.swift` | App lifecycle, panel, hotkeys |
 | `ContentView.swift` | Space button UI |
 | `PrivateWindowCapture.swift` | Screenshot capture |
+| `docs/CAPTURE_SERVICE.md` | Shared capture boundary, backend ownership, validation and regression matrix |
 | `ImageGenerator.swift` | Button image generation |
 | `HotkeyManager.swift` | Composable hotkey system |
 | `WindowSwitching.swift` | Window history and derived recent-Space ordering |
@@ -28,10 +29,11 @@ python3 -m unittest discover
 ```
 
 ## Important Gotchas
-- **Installation:** Follow `docs/INSTALLATION.md` and `docs/RELEASE_1.10.0.md`. The 1.10.0 package uses Apple Development signing, not notarized Developer ID distribution signing; check `SESSION_LOG.md` for publication status.
+- **Installation:** Follow `docs/INSTALLATION.md` and `docs/RELEASE_1.12.0.md`; 1.12.0 includes the previously local 1.11.0 memory fix. Builds use Apple Development signing, not notarized Developer ID distribution signing; check `SESSION_LOG.md` for publication status.
 - **Preview modes:** Default Windows means wallpaper/outlines, not screenshots. Preferences → Button Style → Thumbnail enables cached screenshots for both menu bar and panel. No preference was changed by the documentation update.
 - **SIP/no-animation:** Current yabai supports fast SIP-enabled `space --focus` (7.1.19+). The separate `skip_window_focus_animation` option (7.1.22+, improved 7.1.23) is only for setups without the scripting addition; locally it remains off. See README for upstream sources and limitations.
 - **CGImage Leaks:** Always convert CGImage → PNG immediately, cache only PNG Data
+- **Dynamic Create ownership:** Capture pointers resolved with `dlsym` need explicit retained-reference handling (`Unmanaged<CGImage>` plus `takeRetainedValue()`); PNG caches alone do not release an unbalanced original reference. Measure physical footprint, not just RSS.
 - **Project Naming:** Xcode uses "YabaiIndicator", app branded as "YabaiSpaces"
 - **Remote:** `origin` = your fork, `fork` = also your fork (historical)
 

@@ -23,9 +23,19 @@ class MergeRegressionTests(unittest.TestCase):
     def test_display_capture_keeps_desktop_pixels(self):
         source = (ROOT / "YabaiIndicator/PrivateWindowCapture.swift").read_text()
         capture = source.split("func captureSpace(", 1)[1]
-        self.assertIn("CGDisplayCreateImage(displayID)", capture)
-        self.assertIn("return cgImageToPNG(scaledImage)", capture)
+        self.assertIn("screenshotCaptureService.capture(request)", capture)
+        self.assertIn("CGDisplayCreateImage(request.displayID)", source)
+        self.assertIn("-> Unmanaged<CGImage>?", source)
+        self.assertIn(".takeRetainedValue()", source)
+        self.assertIn("autoreleasepool", source)
         self.assertNotIn("captureWindow(", capture)
+        self.assertNotIn("private func captureWindow(", source)
+        self.assertNotIn("private func captureDisplay(", source)
+        for filename in (ROOT / "YabaiIndicator").rglob("*.swift"):
+            if filename.name == "PrivateWindowCapture.swift":
+                continue
+            self.assertNotRegex(filename.read_text(), r"\b(?:CGDisplayCreateImage|CGWindowListCreateImage\w*)\s*\(",
+                                f"Screenshot API bypasses the shared service: {filename}")
 
     def test_compatible_hotkeys_keep_tested_behavior(self):
         source = (ROOT / "YabaiIndicator/YabaiAppDelegate.swift").read_text()

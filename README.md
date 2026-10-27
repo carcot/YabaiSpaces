@@ -20,15 +20,17 @@ Customizable panel layout and display options
 
 </div>
 
-## Current version: 1.10.0
+## Current version: 1.12.0
 
 This README describes the current source and locally installed `/Applications/YabaiSpaces.app`, including the existing keyboard setup checked on October 6, 2026. Published release DMGs may lag these changes; check the installed version and `--help` rather than assuming an older download supports every command below.
 
-The [universal 1.10.0 DMG](YabaiSpaces-1.10.0-Universal.dmg) includes fresh departure-time thumbnails and Space-only thumbnail clicks. Its exact app is installed locally. Verify the [SHA-256 checksum](YabaiSpaces-1.10.0-Universal.dmg.sha256) and read the [1.10.0 release notes](docs/RELEASE_1.10.0.md). Use [GitHub Releases](https://github.com/carcot/YabaiSpaces/releases) for published downloads and check the release's actual version, not just this README's heading. The retained 1.8.0 DMG is historical and predates these fixes.
+**1.12.0 includes the 1.11.0 memory fix and the shared screenshot service.** Both plain-display and excluded-window capture use one ownership/scaling/PNG boundary, with bounded-memory and success/failure cleanup tests. Wallpaper remains separate; thumbnail timing, panel exclusion, keyboard shortcuts and user settings are unchanged. See [root cause](MEMORY_LEAK_FIX.md) and [service architecture](docs/CAPTURE_SERVICE.md).
 
-**Published:** [YabaiSpaces 1.10.0](https://github.com/carcot/YabaiSpaces/releases/tag/v1.10.0) — [download universal DMG](https://github.com/carcot/YabaiSpaces/releases/download/v1.10.0/YabaiSpaces-1.10.0-Universal.dmg) and [checksum](https://github.com/carcot/YabaiSpaces/releases/download/v1.10.0/YabaiSpaces-1.10.0-Universal.dmg.sha256). Both published assets were downloaded again and byte-compared with the verified local files.
+The [universal 1.12.0 DMG](YabaiSpaces-1.12.0-Universal.dmg) contains the exact verified app installed locally. Check its [SHA-256 checksum](YabaiSpaces-1.12.0-Universal.dmg.sha256) and [release notes](docs/RELEASE_1.12.0.md). Use [GitHub Releases](https://github.com/carcot/YabaiSpaces/releases) for published downloads and verify the actual release version; publication status is recorded in [SESSION_LOG.md](SESSION_LOG.md).
 
-**Distribution warning:** the current local app and 1.10.0 package are **Apple Development signed, not Developer ID signed/notarized for public distribution**. Launching successfully on the development Mac does not establish Gatekeeper acceptance elsewhere. See [installation and Gatekeeper guidance](docs/INSTALLATION.md#signing-and-gatekeeper) before installing a downloaded build.
+**Older packages:** 1.10.0 contains the severe capture-buffer leak and is retained only for history; it does not include the memory fix. The retained 1.8.0 package also predates subsequent thumbnail fixes. The locally deployed 1.11.0 fix was not packaged separately; 1.12.0 includes it.
+
+**Distribution warning:** the current local app and 1.12.0 package are **Apple Development signed, not Developer ID signed/notarized for public distribution**. Launching successfully on the development Mac does not establish Gatekeeper acceptance elsewhere. See [installation and Gatekeeper guidance](docs/INSTALLATION.md#signing-and-gatekeeper) before installing a downloaded build.
 
 ## Features
 
@@ -293,10 +295,12 @@ When the panel is visible:
 
 The menu also exposes **Window controls**, **Edit Caps bindings…**, and **Reload Caps bindings**.
 
-## Changes leading to 1.10.0
+## Changes leading to 1.12.0
 
 | Version/update | Changes |
 | --- | --- |
+| 1.12.0 | Shared screenshot service, private plain/excluded backends, checked requests/encoding, per-request lifetime boundary and tests for both backend footprints and failure cleanup |
+| 1.11.0 (local) | Balance ownership of dynamically loaded excluded-window capture images; add a real physical-footprint growth regression while preserving thumbnail content/timing |
 | 1.10.0 | Thumbnail clicks only switch Spaces; old coordinate-based window selection and drag handler are commented out and retained |
 | 1.9.0 | Fresh outgoing capture after panel dismissal, immediately before departure; explicit YS-window exclusion and a real-pixel timing regression |
 | 1.8.0 | ID-bearing focus/destroy signals, bounded diagnostics, asynchronous intake/query/navigation workers, live reconciliation, registration repair, and explicit ordering/source limitations |
@@ -312,6 +316,10 @@ The menu also exposes **Window controls**, **Edit Caps bindings…**, and **Relo
 Detailed root causes, historical deployments, and verification are in [SESSION_LOG.md](SESSION_LOG.md). Historical mapping tables in the migration documents describe their dates; the active shortcut table above supersedes old Command-L/either-Command descriptions.
 
 ## Development and verification
+
+The packaged **1.12.0** build passed **56 tests with no skips in 132.644 seconds** and a clean signed universal Release build. Plain/excluded real-capture workloads each grew less than 1 MiB after warm-up; deterministic provider-release counters verify success/failure cleanup, invalid requests and no exclusion-dropping retry. Real-pixel departure freshness, overlay exclusion and pre-focus ordering remain covered. The mounted DMG matches the build, which was installed with a verified backup, matching designated requirement and clean replacement, then restarted. Six warm-up panel cycles followed by 40 actual cycles changed physical footprint from **19.5 to 20.4 MiB**, with healthy native focus/command handling. Short checks are not a multi-day leak-free guarantee. See [service tests](docs/CAPTURE_SERVICE.md) and [deployment record](SESSION_LOG.md).
+
+The earlier local **1.11.0** build passed **54 tests with no skips in 102.417 seconds** and an explicit clean signed universal Release build. Its memory regression reproduced roughly 534 MiB of growth across 24 captures before the fix, then stayed below 1 MiB afterward. Six warm-up panel cycles followed by 40 further cycles changed physical footprint from **19.4 to 20.7 MiB**. RSS alone can hide swapped image buffers; see [memory investigation](MEMORY_LEAK_FIX.md).
 
 The packaged **1.10.0** build passed **53 tests with no skips in 85.362 seconds**, including a guard that thumbnail clicks only switch Spaces and the old hit-testing code remains commented out. A clean signed universal Release build was installed with verified backup/signature/contents, then restarted and checked through native command handling and two actual panel open/close cycles. The mounted DMG matched the build; its signature, version, both architectures, Applications shortcut, and checksum were verified. Physical click/Space-selection and multi-display verification remain separate.
 

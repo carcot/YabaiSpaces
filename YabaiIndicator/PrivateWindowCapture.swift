@@ -11,101 +11,52 @@ import CoreGraphics
 import ImageIO
 import UniformTypeIdentifiers
 
-// Private API function types
-typealias CGWindowListCreateImageFn = @convention(c) (CGRect, CFArray?, UInt32) -> CGImage?
-typealias CGWindowListCreateImageFromRectFn = @convention(c) (CGRect, CFArray?, UInt32, CGRect) -> CGImage?
+struct ScreenshotRequest {
+    let displayID: CGDirectDisplayID
+    let targetSize: CGSize
+    var excludedWindowIDs: Set<CGWindowID> = []
+}
 
-class PrivateWindowCapture {
-    private let captureQueue = DispatchQueue(label: "yabai-indicator.capture", qos: .userInitiated)
+enum ScreenshotFailure: Error, Equatable {
+    case invalidRequest
+    case captureUnavailable
+    case encodingFailed
+}
 
-    // Cached wallpaper PNG data (not CGImage to avoid retention leaks)
-    private var cachedWallpaperData: Data?
-    private var cachedWallpaperSize: CGSize?
-    private var cacheVersion = 0
+private typealias CreateWindowImage = @convention(c) (CGRect, CFArray?, UInt32) -> Unmanaged<CGImage>?
 
-    // Private API function pointers
-    private var cgWindowListCreateImage: CGWindowListCreateImageFn?
-    private var cgWindowListCreateImageFromRect: CGWindowListCreateImageFromRectFn?
-    private var cgWindowListCreateImageFromArray: CGWindowListCreateImageFn?
+private final class ScreenshotBackend {
+    private var createWindowImage: CreateWindowImage?
 
     init() {
-        loadPrivateAPIs()
-    }
-
-    private func loadPrivateAPIs() {
-        // Try CoreGraphics framework
         if let handle = dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", RTLD_LAZY) {
+            defer { dlclose(handle) }
             if let symbol = dlsym(handle, "CGWindowListCreateImageFromArray") {
-                cgWindowListCreateImageFromArray = unsafeBitCast(symbol, to: CGWindowListCreateImageFn.self)
+                createWindowImage = unsafeBitCast(symbol, to: CreateWindowImage.self)
             }
-            // Try various possible function names
-            let functionNames = [
-                "CGWindowListCreateImage",
-                "_CGWindowListCreateImage",
-                "CGWindowListCreateImageWithOptions",
-                "_CGWindowListCreateImageWithOptions"
-            ]
-
-            for name in functionNames {
-                if let symbol = dlsym(handle, name) {
-                    cgWindowListCreateImage = unsafeBitCast(symbol, to: CGWindowListCreateImageFn.self)
-                    break
-                }
-            }
-
-            let rectFunctionNames = [
-                "CGWindowListCreateImageFromRect",
-                "_CGWindowListCreateImageFromRect"
-            ]
-
-            for name in rectFunctionNames {
-                if let symbol = dlsym(handle, name) {
-                    cgWindowListCreateImageFromRect = unsafeBitCast(symbol, to: CGWindowListCreateImageFromRectFn.self)
-                    break
-                }
-            }
-
-            dlclose(handle)
         }
     }
 
-    /// Capture a single window by ID
-    private func captureWindow(windowID: Int, bounds: CGRect, size: CGSize) -> CGImage? {
-        let windowArray = [windowID] as CFArray
-
-        // Use window-specific bounds, not full display
-        if let cgWindowListCreateImage = cgWindowListCreateImage {
-            if let image = cgWindowListCreateImage(bounds, windowArray, 0) {
-                return scaleImage(image, to: size)
-            }
+    func capture(_ request: ScreenshotRequest) -> CGImage? {
+        guard CGPreflightScreenCaptureAccess() else { return nil }
+        if request.excludedWindowIDs.isEmpty {
+            return CGDisplayCreateImage(request.displayID)
         }
-
-        // Try the rect-based API
-        if let cgWindowListCreateImageFromRect = cgWindowListCreateImageFromRect {
-            if let image = cgWindowListCreateImageFromRect(bounds, windowArray, 0, .null) {
-                return scaleImage(image, to: size)
-            }
+        guard let createWindowImage,
+              let records = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]],
+              let windows = CFArrayCreateMutable(nil, 0, nil) else { return nil }
+        for record in records {
+            guard let identifier = (record[kCGWindowNumber as String] as? NSNumber)?.uint32Value,
+                  identifier > 0, !request.excludedWindowIDs.contains(identifier) else { continue }
+            CFArrayAppendValue(windows, UnsafeRawPointer(bitPattern: UInt(identifier)))
         }
-
-        return nil
+        guard CFArrayGetCount(windows) > 0 else { return nil }
+        return createWindowImage(CGDisplayBounds(request.displayID), windows, 0)?.takeRetainedValue()
     }
+}
 
-    /// Get CGDirectDisplayID for a display index
-    private func getDisplayID(for index: Int) -> CGDirectDisplayID? {
-        var displayCount: UInt32 = 0
-        var result = CGGetActiveDisplayList(32, nil, &displayCount)
-
-        guard result == .success, displayCount > 0 else { return nil }
-
-        var displayIDs = [CGDirectDisplayID](repeating: 0, count: Int(displayCount))
-        result = CGGetActiveDisplayList(32, &displayIDs, &displayCount)
-
-        guard result == .success, index < Int(displayCount) else { return nil }
-
-        return displayIDs[index]
-    }
-
-    private func scaleImage(_ image: CGImage, to size: CGSize) -> CGImage? {
+private enum CaptureImageProcessing {
+    static func scale(_ image: CGImage, to size: CGSize) -> CGImage? {
         if image.width == Int(size.width) && image.height == Int(size.height) {
             return image
         }
@@ -126,16 +77,72 @@ class PrivateWindowCapture {
         return context?.makeImage()
     }
 
-    /// Capture entire display content (desktop background)
-    private func captureDisplay(displayID: CGDirectDisplayID, targetSize: CGSize) -> CGImage? {
-        // Use CGWindowListCreateImage with nil window array to capture screen
-        if let cgWindowListCreateImage = cgWindowListCreateImage {
-            let bounds = CGRect(origin: .zero, size: CGDisplayBounds(displayID).size)
-            if let image = cgWindowListCreateImage(bounds, nil, 0) {
-                return scaleImage(image, to: targetSize)
+    static func png(_ image: CGImage) -> Data? {
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else {
+            return nil
+        }
+        CGImageDestinationAddImage(destination, image, nil)
+        guard CGImageDestinationFinalize(destination), data.length > 0 else { return nil }
+        return data as Data
+    }
+}
+
+final class ScreenshotCaptureService {
+    private let captureQueue = DispatchQueue(label: "yabai-indicator.capture", qos: .userInitiated)
+    private let captureImage: (ScreenshotRequest) -> CGImage?
+    private let encodePNG: (CGImage) -> Data?
+
+    init() {
+        let backend = ScreenshotBackend()
+        captureImage = backend.capture
+        encodePNG = CaptureImageProcessing.png
+    }
+
+    init(captureImage: @escaping (ScreenshotRequest) -> CGImage?, encodePNG: @escaping (CGImage) -> Data?) {
+        self.captureImage = captureImage
+        self.encodePNG = encodePNG
+    }
+
+    private func isActiveDisplay(_ identifier: CGDirectDisplayID) -> Bool {
+        var count: UInt32 = 0
+        guard CGGetActiveDisplayList(0, nil, &count) == .success, count > 0 else { return false }
+        var identifiers = [CGDirectDisplayID](repeating: 0, count: Int(count))
+        guard CGGetActiveDisplayList(count, &identifiers, &count) == .success else { return false }
+        return identifiers.prefix(Int(count)).contains(identifier)
+    }
+
+    func capture(_ request: ScreenshotRequest) -> Result<Data, ScreenshotFailure> {
+        captureQueue.sync {
+            autoreleasepool {
+                let size = request.targetSize
+                guard request.displayID != 0,
+                      size.width.isFinite, size.height.isFinite,
+                      size.width >= 1, size.height >= 1, size.width <= 8192, size.height <= 8192,
+                      size.width * size.height <= 16_777_216,
+                      !request.excludedWindowIDs.contains(0), isActiveDisplay(request.displayID) else {
+                    return .failure(.invalidRequest)
+                }
+                guard let image = captureImage(request),
+                      let scaled = CaptureImageProcessing.scale(image, to: size) else {
+                    return .failure(.captureUnavailable)
+                }
+                guard let data = encodePNG(scaled), !data.isEmpty else { return .failure(.encodingFailed) }
+                return .success(data)
             }
         }
-        return nil
+    }
+}
+
+private let screenshotCaptureService = ScreenshotCaptureService()
+
+class PrivateWindowCapture {
+    private var cachedWallpaperData: Data?
+    private var cachedWallpaperSize: CGSize?
+    private var cacheVersion = 0
+
+    private func scaleImage(_ image: CGImage, to size: CGSize) -> CGImage? {
+        CaptureImageProcessing.scale(image, to: size)
     }
 
     /// Capture just the desktop wallpaper for a display (no windows)
@@ -192,13 +199,7 @@ class PrivateWindowCapture {
     // MARK: - Private helpers
 
     private func cgImageToPNG(_ cgImage: CGImage) -> Data {
-        let data = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else {
-            return Data()
-        }
-        CGImageDestinationAddImage(destination, cgImage, nil)
-        CGImageDestinationFinalize(destination)
-        return data as Data
+        CaptureImageProcessing.png(cgImage) ?? Data()
     }
 
     private func cgImageFromPNG(_ data: Data) -> CGImage? {
@@ -240,30 +241,11 @@ class PrivateWindowCapture {
     }
 
     func captureSpace(display: Display, targetSize: CGSize, excludingWindowIDs: Set<CGWindowID> = []) -> Data? {
-        return captureQueue.sync {
-            let displayID = CGDirectDisplayID(display.id)
-            let displayImage: CGImage?
-            if excludingWindowIDs.isEmpty {
-                displayImage = CGDisplayCreateImage(displayID)
-            } else {
-                guard let createImage = cgWindowListCreateImageFromArray,
-                      let records = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID)
-                        as? [[String: Any]],
-                      let windows = CFArrayCreateMutable(nil, 0, nil) else { return nil }
-                for record in records {
-                    guard let identifier = (record[kCGWindowNumber as String] as? NSNumber)?.uint32Value,
-                          identifier > 0, !excludingWindowIDs.contains(identifier) else { continue }
-                    CFArrayAppendValue(windows, UnsafeRawPointer(bitPattern: UInt(identifier)))
-                }
-                displayImage = createImage(CGDisplayBounds(displayID), windows, 0)
-            }
-            guard let displayImage,
-                  let scaledImage = scaleImage(displayImage, to: targetSize) else {
-                return nil
-            }
-
-            return cgImageToPNG(scaledImage)
-        }
+        guard let identifier = CGDirectDisplayID(exactly: display.id) else { return nil }
+        let request = ScreenshotRequest(displayID: identifier, targetSize: targetSize,
+                                        excludedWindowIDs: excludingWindowIDs)
+        guard case .success(let data) = screenshotCaptureService.capture(request) else { return nil }
+        return data
     }
 }
 

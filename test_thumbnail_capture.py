@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import platform
 import subprocess
 import tempfile
@@ -20,6 +21,154 @@ def method(source, signature):
 
 
 class ThumbnailCaptureTests(unittest.TestCase):
+    def test_excluded_capture_memory_stays_bounded(self):
+        self.check_capture_memory(excluded=True)
+
+    def test_display_capture_memory_stays_bounded(self):
+        self.check_capture_memory(excluded=False)
+
+    def check_capture_memory(self, excluded):
+        harness = r'''import AppKit
+import Darwin
+struct Display { let id: UInt32 }
+func footprint() -> UInt64 {
+    var information = task_vm_info_data_t()
+    var count = mach_msg_type_number_t(MemoryLayout.size(ofValue: information) / MemoryLayout<integer_t>.size)
+    let result = withUnsafeMutablePointer(to: &information) { pointer in
+        pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+            task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+        }
+    }
+    precondition(result == KERN_SUCCESS)
+    return information.phys_footprint
+}
+@main struct Checks {
+    static func main() {
+        guard CGPreflightScreenCaptureAccess() else { exit(77) }
+        let displayID = CGMainDisplayID()
+        let display = Display(id: displayID)
+        let capture = PrivateWindowCapture()
+        let excludedWindowIDs: Set<CGWindowID> = EXCLUDED_WINDOWS
+        for _ in 0..<4 {
+            autoreleasepool {
+                precondition(capture.captureSpace(display: display, targetSize: CGSize(width: 160, height: 90),
+                                                  excludingWindowIDs: excludedWindowIDs)?.isEmpty == false)
+            }
+        }
+        let before = footprint()
+        for _ in 0..<24 {
+            autoreleasepool {
+                precondition(capture.captureSpace(display: display, targetSize: CGSize(width: 160, height: 90),
+                                                  excludingWindowIDs: excludedWindowIDs)?.isEmpty == false)
+            }
+        }
+        let after = footprint()
+        let frameBytes = UInt64(CGDisplayPixelsWide(displayID) * CGDisplayPixelsHigh(displayID) * 4)
+        let output = ["before": before, "after": after, "limit": max(32 * 1024 * 1024, frameBytes * 3)]
+        let data = try! JSONSerialization.data(withJSONObject: output, options: [.sortedKeys])
+        print(String(data: data, encoding: .utf8)!)
+    }
+}
+'''.replace("EXCLUDED_WINDOWS", "[CGWindowID.max]" if excluded else "[]")
+        with tempfile.TemporaryDirectory(prefix="ys-thumbnail-memory-", dir="/tmp") as directory:
+            root = Path(directory)
+            source = root / "Checks.swift"
+            source.write_text(harness)
+            binary = root / "checks"
+            subprocess.run([
+                "xcrun", "swiftc", "-parse-as-library", "-module-cache-path", str(root / "cache"),
+                "-target", f"{platform.machine()}-apple-macos11.6",
+                str(ROOT / "YabaiIndicator/PrivateWindowCapture.swift"), str(source), "-o", str(binary),
+            ], check=True, timeout=120)
+            result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=60)
+            if result.returncode == 77:
+                self.skipTest("Capture memory verification requires existing Screen Recording permission; no permission was requested")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            memory = json.loads(result.stdout)
+            print(f"Capture footprint (excluded={excluded}): {memory}", flush=True)
+            self.assertLessEqual(memory["after"] - memory["before"], memory["limit"],
+                                 "Repeated captures retain full-screen image buffers")
+
+    def test_shared_service_ownership_validation_and_failure(self):
+        harness = r'''import AppKit
+struct Display { let id: UInt32 }
+class Lifetime {
+    var released = 0
+    var captures = 0
+    var encodes = 0
+}
+func image(_ lifetime: Lifetime) -> CGImage {
+    let pixels = UnsafeMutableRawPointer.allocate(byteCount: 16, alignment: 8)
+    pixels.initializeMemory(as: UInt8.self, repeating: 255, count: 16)
+    let provider = CGDataProvider(dataInfo: Unmanaged.passUnretained(lifetime).toOpaque(),
+                                  data: pixels, size: 16, releaseData: { context, bytes, _ in
+        Unmanaged<Lifetime>.fromOpaque(context!).takeUnretainedValue().released += 1
+        UnsafeMutableRawPointer(mutating: bytes).deallocate()
+    })!
+    return CGImage(width: 2, height: 2, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: 8,
+                   space: CGColorSpaceCreateDeviceRGB(),
+                   bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                   provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)!
+}
+@main struct Checks {
+    static func main() {
+        let lifetime = Lifetime()
+        var failCapture = false
+        var encoding: Data? = Data([1, 2, 3])
+        let service = ScreenshotCaptureService(captureImage: { request in
+            precondition(request.excludedWindowIDs == [42])
+            lifetime.captures += 1
+            return failCapture ? nil : image(lifetime)
+        }, encodePNG: { scaled in
+            precondition(scaled.width == 1 && scaled.height == 1)
+            lifetime.encodes += 1
+            return encoding
+        })
+        let request = ScreenshotRequest(displayID: CGMainDisplayID(), targetSize: CGSize(width: 1, height: 1),
+                                        excludedWindowIDs: [42])
+        for _ in 0..<20 {
+            guard case .success(let data) = service.capture(request) else { fatalError("Capture failed") }
+            precondition(data == Data([1, 2, 3]))
+        }
+        precondition(lifetime.released == 20 && lifetime.captures == 20 && lifetime.encodes == 20)
+        for output: Data? in [nil, Data()] {
+            encoding = output
+            guard case .failure(.encodingFailed) = service.capture(request) else { fatalError("Bad encoding accepted") }
+        }
+        precondition(lifetime.released == 22)
+        failCapture = true
+        guard case .failure(.captureUnavailable) = service.capture(request) else { fatalError("Fallback bypassed failure") }
+        precondition(lifetime.captures == 23 && lifetime.encodes == 22 && lifetime.released == 22)
+        let invalidSizes = [CGSize.zero, CGSize(width: -1, height: 1), CGSize(width: CGFloat.nan, height: 1),
+                            CGSize(width: CGFloat.infinity, height: 1), CGSize(width: 8193, height: 1),
+                            CGSize(width: 8192, height: 8192)]
+        for size in invalidSizes {
+            let invalid = ScreenshotRequest(displayID: request.displayID, targetSize: size, excludedWindowIDs: [42])
+            guard case .failure(.invalidRequest) = service.capture(invalid) else { fatalError("Bad size accepted") }
+        }
+        for identifier: CGDirectDisplayID in [0, .max] {
+            let invalid = ScreenshotRequest(displayID: identifier, targetSize: request.targetSize)
+            guard case .failure(.invalidRequest) = service.capture(invalid) else { fatalError("Bad display accepted") }
+        }
+        let invalid = ScreenshotRequest(displayID: request.displayID, targetSize: request.targetSize, excludedWindowIDs: [0])
+        guard case .failure(.invalidRequest) = service.capture(invalid) else { fatalError("Bad exclusion accepted") }
+        precondition(lifetime.captures == 23 && lifetime.encodes == 22)
+        print("Shared service releases buffers on success/failure, rejects invalid requests, and never retries without exclusions")
+    }
+}
+'''
+        with tempfile.TemporaryDirectory(prefix="ys-capture-service-", dir="/tmp") as directory:
+            root = Path(directory)
+            source = root / "Checks.swift"
+            source.write_text(harness)
+            binary = root / "checks"
+            subprocess.run([
+                "xcrun", "swiftc", "-parse-as-library", "-module-cache-path", str(root / "cache"),
+                "-target", f"{platform.machine()}-apple-macos11.6",
+                str(ROOT / "YabaiIndicator/PrivateWindowCapture.swift"), str(source), "-o", str(binary),
+            ], check=True, timeout=120)
+            subprocess.run([str(binary)], check=True, timeout=15)
+
     def test_capture_ignores_unrepresentable_window_numbers(self):
         delegate = (ROOT / "YabaiIndicator/YabaiAppDelegate.swift").read_text()
         harness = r'''import Foundation
