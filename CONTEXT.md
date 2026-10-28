@@ -4,9 +4,9 @@
 macOS menu bar app that displays clickable space indicators. Integrates with Yabai for space switching.
 
 ## Current State
-- **Version:** 1.12.0 installed locally and packaged as a verified universal DMG, including the memory fix and shared capture service. See `SESSION_LOG.md` for GitHub publication status. Historical 1.10.0 has the capture leak.
+- **Version:** 1.12.0 installed locally and [published as latest on GitHub](https://github.com/carcot/YabaiSpaces/releases/tag/v1.12.0), including the memory fix and shared capture service. Downloaded DMG/checksum match local files; see `SESSION_LOG.md`. Historical 1.10.0 has the capture leak.
 - **Status:** Exact packaged clean signed universal Release app verified and installed/restarted; 56 tests pass with no skips. Both backends' footprint tests and actual pixel/timing tests pass. Forty panel cycles after warm-up stayed near 20 MiB; multi-day soak remains unverified.
-- **Last work:** October 27, 2026 - implemented private screenshot backends behind one ownership/scaling/PNG service, removed dormant capture paths, expanded lifetime/failure/backend tests, and prepared 1.12.0 publication
+- **Last work:** October 27, 2026 - implemented/tested the shared capture service, installed/restarted its exact universal Release app, pushed source/docs/package and published 1.12.0; tag and downloaded assets verified
 
 ## Key Files to Know
 | File | Purpose |

@@ -1,5 +1,13 @@
 # Session Log
 
+## 2026-10-27: Published 1.12.0 and verified actual downloads
+
+Committed all accumulated 1.11.0 memory-fix work, the implemented capture service, expanded regressions, documentation and universal DMG/checksum as **`2958ae8ef82e115d71bd089eb8a7dc6c2af0a048`**. Used `jj status` → `jj diff` → `jj new` → squash the prior working-copy change into the new change → `jj commit`, then advanced main and pushed the existing HTTPS `fork` remote without force-pushing or changing remote URLs. Remote main advanced from `3f7a2b30` to `2958ae8e`. The existing `carcot` account's admin/push access was verified; no new login, private-key export or credential disclosure was needed.
+
+Published [YabaiSpaces 1.12.0](https://github.com/carcot/YabaiSpaces/releases/tag/v1.12.0) as **latest**, non-draft/non-prerelease, at **2026-10-27T22:45:35Z**. Tag `v1.12.0` and release target resolve to `2958ae8ef82e115d71bd089eb8a7dc6c2af0a048`. Assets are the **2,440,504-byte** universal DMG and 99-byte checksum file. GitHub reports the expected DMG digest **`8b3e04abde085dad29bba11315297763ec01e2d02aac07097cd9dad3c8184b7b`**. Downloaded both assets to `/private/tmp/ys-release-1.12.0-download.iZapPi`: the published checksum and separate byte comparisons against both local originals passed. This verification itself contributes a download to release statistics.
+
+Post-publication checks reconfirmed installed version 1.12.0, matching release/build contents, strict signature, exactly one running installed process (**88912**) and healthy native signals/no degradation. The prior full 56-test run, mounted-image comparison, protected installation/restart and 40-cycle memory check remain the verification of this exact runtime. No runtime change/restart was needed for publication metadata. Updated README/install download links and context/safe-development publication status; this final documentation-only record is committed/pushed separately from the release tag, with unchanged app contents and assets.
+
 ## 2026-10-27: Implement shared capture service and prepare 1.12.0 release
 
 User approved implementing the documented generalized service, then pushing/publishing a new app bundle. The 1.11.0 leak fix and documentation were still uncommitted; include that work in the 1.12.0 release rather than losing or publishing an unfixed older path. Incremented source version to **1.12.0**. No new capture mode or navigation/input policy was added.

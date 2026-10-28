@@ -28,6 +28,8 @@ This README describes the current source and locally installed `/Applications/Ya
 
 The [universal 1.12.0 DMG](YabaiSpaces-1.12.0-Universal.dmg) contains the exact verified app installed locally. Check its [SHA-256 checksum](YabaiSpaces-1.12.0-Universal.dmg.sha256) and [release notes](docs/RELEASE_1.12.0.md). Use [GitHub Releases](https://github.com/carcot/YabaiSpaces/releases) for published downloads and verify the actual release version; publication status is recorded in [SESSION_LOG.md](SESSION_LOG.md).
 
+**Published latest:** [YabaiSpaces 1.12.0](https://github.com/carcot/YabaiSpaces/releases/tag/v1.12.0) — [download universal DMG](https://github.com/carcot/YabaiSpaces/releases/download/v1.12.0/YabaiSpaces-1.12.0-Universal.dmg) and [checksum](https://github.com/carcot/YabaiSpaces/releases/download/v1.12.0/YabaiSpaces-1.12.0-Universal.dmg.sha256). Both assets were downloaded again and byte-compared with the verified local files.
+
 **Older packages:** 1.10.0 contains the severe capture-buffer leak and is retained only for history; it does not include the memory fix. The retained 1.8.0 package also predates subsequent thumbnail fixes. The locally deployed 1.11.0 fix was not packaged separately; 1.12.0 includes it.
 
 **Distribution warning:** the current local app and 1.12.0 package are **Apple Development signed, not Developer ID signed/notarized for public distribution**. Launching successfully on the development Mac does not establish Gatekeeper acceptance elsewhere. See [installation and Gatekeeper guidance](docs/INSTALLATION.md#signing-and-gatekeeper) before installing a downloaded build.
