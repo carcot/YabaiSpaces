@@ -2,7 +2,7 @@
 
 Use the current **1.13.0** package, which retains 1.12.0's capture-memory fix and shared screenshot service and updates release/recovery documentation. **1.10.0 has a severe screenshot-capture memory leak** and is historical. The local 1.11.0 fix was not packaged separately. See the [memory investigation](../MEMORY_LEAK_FIX.md) and [shared service](CAPTURE_SERVICE.md).
 
-The [1.13.0 universal DMG](../YabaiSpaces-1.13.0-Universal.dmg) and [checksum](../YabaiSpaces-1.13.0-Universal.dmg.sha256) match the verified installed app. Get published downloads from [GitHub Releases](https://github.com/carcot/YabaiSpaces/releases), read the [1.13.0 release notes](RELEASE_1.13.0.md), and check verification in the session log. The separate skhd repair is not bundled in YS or automatically applied by this installation.
+The published [1.13.0 release](https://github.com/carcot/YabaiSpaces/releases/tag/v1.13.0), [universal DMG](https://github.com/carcot/YabaiSpaces/releases/download/v1.13.0/YabaiSpaces-1.13.0-Universal.dmg) and [checksum](https://github.com/carcot/YabaiSpaces/releases/download/v1.13.0/YabaiSpaces-1.13.0-Universal.dmg.sha256) match the verified installed app. Both downloads were independently byte-compared with local originals. Read the [release notes](RELEASE_1.13.0.md) and verification in the session log. The separate skhd repair is not bundled in YS or automatically applied by this installation.
 
 ## Signing and Gatekeeper
 

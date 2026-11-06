@@ -4,9 +4,9 @@
 macOS menu bar app that displays clickable space indicators. Integrates with Yabai for space switching.
 
 ## Current State
-- **Version:** 1.13.0 installed locally and packaged as a verified universal DMG; see `SESSION_LOG.md` for publication status. Runtime source matches 1.12.0 and retains the memory fix/shared capture service. Historical 1.10.0 has the capture leak.
+- **Version:** 1.13.0 installed locally and [published as latest](https://github.com/carcot/YabaiSpaces/releases/tag/v1.13.0); downloaded assets match verified local files. Runtime source matches 1.12.0 and retains the memory fix/shared capture service. See `SESSION_LOG.md`; historical 1.10.0 has the capture leak.
 - **Status:** Exact packaged clean signed universal Release app verified and installed/restarted; all 56 tests passed with no skips in 105.504 seconds. Both backend memory/pixel/timing checks and two actual panel cycles pass. Another real wake cycle and multi-day soak are not established by this fresh build.
-- **Last work:** November 6, 2026 - committed/pushed the skhd recovery documentation, then prepared and installed the requested fresh 1.13.0 bundle. It does not bundle skhd or implement a new YS sleep/wake fix.
+- **Last work:** November 6, 2026 - committed/pushed the recovery documentation, installed/restarted and published the requested fresh 1.13.0 universal bundle, then verified its tag, downloads and running app. It does not bundle skhd or implement a new YS sleep/wake fix.
 
 ## Key Files to Know
 | File | Purpose |

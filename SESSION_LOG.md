@@ -1,5 +1,13 @@
 # Session Log
 
+## 2026-11-06: Publish and verify 1.13.0 release
+
+After pushing the pending recovery documents as `f43b4c0a201dd295dd1860b19a35479f16cf80e3`, committed the requested new version, verified DMG/checksum, release notes and aligned documentation as **`dd1bf663354ed7bfb74bb09f67f430b409b7a4a5`**, `Release YabaiSpaces 1.13.0 fresh universal build and recovery docs`. Used the mandated JJ review/new/commit workflow and advanced/pushed main through the existing HTTPS fork remote, with the stored `carcot` credential scoped per command. No force push, global account switch or credential disclosure was needed.
+
+Published [YabaiSpaces 1.13.0](https://github.com/carcot/YabaiSpaces/releases/tag/v1.13.0) as **latest**, non-draft/non-prerelease, at **2026-11-06T08:12:43Z**. Tag `v1.13.0` and release target resolve to `dd1bf663354ed7bfb74bb09f67f430b409b7a4a5`. Assets: **2,440,405-byte** universal DMG and **99-byte** checksum. Expected/GitHub-reported DMG digest is **`786b233869a50028c7a183fe7cc835a5c25b68b1d232d733595fa58c0f8e6a07`**. Re-downloaded both to `/private/tmp/ys-release-1.13.0-download.3i8yMY`; the checksum and independent byte comparisons against both local originals passed. Verification itself contributes a download to release statistics.
+
+Post-publication checks reconfirmed installed 1.13.0, strict signature, complete installed/build content match, one installed YS process (**69104**) and healthy native signals/no degradation. Local environment was rechecked as macOS 26.6.2, yabai 7.1.25, SIP enabled. The full 56-test run, mounted-image verification, protected deployment and two actual panel cycles in the preparation entry apply to this exact build; no additional runtime changes or keyboard ownership/service changes accompanied publication. Added verified public links and final status to README, installation, quick context and safe-development records. This final documentation-only follow-up is committed/pushed separately from the release tag; app/artifact bytes are unchanged.
+
 ## 2026-11-06: Push recovery documentation and prepare requested fresh 1.13.0 bundle
 
 User requested committing all changes, pushing, and then publishing a new app bundle. The five pending files were recovery/routing documentation only; YS runtime source had not changed. Validated Markdown/local links/anchors/shell examples, then used the required JJ status/diff/new/commit workflow (squashing the former working-copy change into the new change before commit), advanced main and pushed **`f43b4c0a201dd295dd1860b19a35479f16cf80e3`**, `Document skhd signing recovery and current keyboard routing`. GitHub credentials were scoped to each push via the stored `carcot` token without printing it or changing another project's active account.
