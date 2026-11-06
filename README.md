@@ -22,7 +22,7 @@ Customizable panel layout and display options
 
 ## Current version: 1.12.0
 
-This README describes the current source and locally installed `/Applications/YabaiSpaces.app`, including the existing keyboard setup checked on October 6, 2026. Published release DMGs may lag these changes; check the installed version and `--help` rather than assuming an older download supports every command below.
+This README describes the current source and locally installed `/Applications/YabaiSpaces.app`, with local keyboard routing rechecked during November 4–5, 2026 recovery. Published release DMGs may lag documentation/configuration changes; check the installed version and `--help` rather than assuming an older download supports every command below.
 
 **1.12.0 includes the 1.11.0 memory fix and the shared screenshot service.** Both plain-display and excluded-window capture use one ownership/scaling/PNG boundary, with bounded-memory and success/failure cleanup tests. Wallpaper remains separate; thumbnail timing, panel exclusion, keyboard shortcuts and user settings are unchanged. See [root cause](MEMORY_LEAK_FIX.md) and [service architecture](docs/CAPTURE_SERVICE.md).
 
@@ -49,14 +49,16 @@ The [universal 1.12.0 DMG](YabaiSpaces-1.12.0-Universal.dmg) contains the exact 
 
 The following describes this machine's configured shortcuts, not mappings automatically installed by YS on every Mac.
 
+The current local setup has **two skhd layers**: an experimental remap agent/grabber for built-in-keyboard tap/hold behavior, and the ordinary skhd service for high-level command dispatch. Both must be healthy; a running remapper alone does not dispatch YS panel/history commands. See [current handlers and service recovery](docs/KEYBOARD_HANDLERS.md).
+
 | Input | Action | Routing |
 | --- | --- | --- |
-| Right-Shift tap | Show the Spaces panel; if already visible, activate the selected Space | Karabiner emits F18 → skhd → YS |
+| Right-Shift tap | Show the Spaces panel; if already visible, activate the selected Space | skhd remapper emits F18 → high-level skhd → YS |
 | Command–Option–Control–Shift–Space (Hyper-Space) | Toggle the Spaces panel | YS's built-in hotkey; the existing BetterTouchTool gesture also emits this chord |
-| Right-Command tap | Cycle recent Spaces, restoring each Space's latest eligible window | Karabiner emits Command-F19 → skhd → YS |
-| Right-Option tap | Cycle individual windows in the current Space | Karabiner emits Option-F19 → skhd → YS |
+| Right-Command tap | Cycle recent Spaces, restoring each Space's latest eligible window | skhd remapper emits Command-F19 → high-level skhd → YS |
+| Right-Option tap | Cycle individual windows in the current Space | skhd remapper emits Option-F19 → high-level skhd → YS |
 | Command-period | Cycle recent Spaces | skhd → YS |
-| Caps tap, then a configured letter | Jump to the latest eligible matching application/window | Karabiner emits unmodified F20 → YS directly |
+| Caps tap, then a configured letter | Jump to the latest eligible matching application/window | skhd remapper emits unmodified F20 → YS directly |
 | Left-Command tap | No YS action; normal Command behavior remains | Its former Karabiner tap rule was removed |
 | Command-L | Normal shortcut in the focused application | The global skhd binding was removed |
 
@@ -74,18 +76,19 @@ cmd - 0x2F : /Applications/YabaiSpaces.app/Contents/MacOS/YabaiIndicator space n
 ### Who handles what?
 
 - **YS** owns panel behavior, prefix timing/key consumption, application/window selection, window MRU, cycling, borders, and manual window controls.
-- **skhd** dispatches the four high-level shortcuts above. The installed daemon is `skhd.zig v0.2.0-7e95d99`; it uses the ordinary event-tap route, not a newly enabled keyboard grabber.
-- **Karabiner** still recognizes physical tap versus hold and preserves application-specific remapping. Caps holds remain Right Control in configured terminals/Screen Sharing and Left Command under the general rule. Emacs/Portacle remain excluded from those Caps rules. Terminal-specific Tab tap/Control hold and the remaining remaps are preserved.
+- **High-level skhd** (`0.2.1-79e0639`, fast build) dispatches the four commands above using `~/.config/skhd/skhdrc` and an ordinary event tap.
+- **Experimental skhd remap agent/grabber** reads `~/.config/skhd/remap.skhdrc`, handles physical taps/holds and application-specific rules, and uses the pqrs VirtualHIDDevice v8.5 driver. Current rules target the built-in keyboard. Caps holds remain Right Control in configured terminals/Screen Sharing and Left Command generally; Emacs/Portacle Caps exclusions and terminal Tab tap/Control hold rules remain configured.
+- **Karabiner-Elements user agents** are not the current keyboard owner. Its separate pqrs virtual-HID driver/daemon remains a dependency of the experimental grabber; do not remove or downgrade it merely because a different skhd binary prints an older pinned-version warning.
 - **Hammerspoon** is no longer responsible for the migrated YS prefix/navigation actions. Unrelated Hammerspoon automation is not removed.
 - **yabai** supplies windows, Spaces, focus events, and move/resize/BSP layout operations. YS does not maintain a competing tiling tree.
 
-Reliance on Karabiner is minimized only where behavior is preserved. A skhd-only tap/hold handoff remains deferred; it was not implemented by rewriting skhd, downgrading the shared driver, or running competing grabbers. Application-specific hotkey dispatch is not the same as application-specific tap/hold remapping. See the dated [grabber compatibility research](docs/SKHD_GRABBER_RESEARCH.md) and [shortcut migration/rollback](docs/SHORTCUT_MIGRATION.md).
+The local skhd tap/hold migration was performed separately from YS development and is not installed by the YS bundle. Application-specific hotkey dispatch is not the same as application-specific tap/hold remapping. The dated [grabber compatibility research](docs/SKHD_GRABBER_RESEARCH.md) and [shortcut migration/rollback](docs/SHORTCUT_MIGRATION.md) describe earlier stages; [current handler notes](docs/KEYBOARD_HANDLERS.md) supersede their ownership descriptions for this machine. The recent repair restored high-level service signing/registration, not a new remapping policy or proven sleep/wake fix.
 
 ## Caps-tap application and Space bindings
 
 Tap Caps, then an unmodified mapped key within **two seconds**. Another Caps tap renews the prefix. During the prefix, selection keys are consumed rather than typed into the application. Escape, period, or an unconfigured letter dismisses it without navigation. Caps-period does **not** cycle windows. After timeout, keys resume normal application behavior; modified chords and other unrecognized keys do not select an application.
 
-YS selects the most recently focused eligible matching window. It does not launch missing applications, unhide/minimize windows, or move them into the requested Space. A Space condition means a yabai Space index, not a window number. A jump ends any active cycling session. Physical Caps tap availability still follows the Karabiner application conditions above.
+YS selects the most recently focused eligible matching window. It does not launch missing applications, unhide/minimize windows, or move them into the requested Space. A Space condition means a yabai Space index, not a window number. A jump ends any active cycling session. Physical Caps tap availability follows the remapper's device/application conditions above.
 
 Bindings are in `~/.config/yabaispaces/config.toml`. Keep app and optional Space together:
 
@@ -209,7 +212,7 @@ External switches that bypass YS, such as Mission Control gestures or direct yab
 
 - macOS with a running [yabai](https://github.com/asmvik/yabai) daemon. The tested baseline is yabai **7.1.25**, Apple Silicon, macOS **26.6.2**, with **SIP enabled**; this is not a guarantee for every macOS release or Intel Mac.
 - Accessibility/input-monitoring authorization as required for yabai, YS event taps/window controls, and your shortcut tools; Screen Recording authorization for real desktop thumbnails. Each tool needs its own applicable permissions.
-- skhd/Karabiner are needed for this machine's physical tap mappings, not for basic menu/panel use or direct native commands.
+- Physical tap mappings need the configured tap/hold remapper and high-level skhd dispatch; this machine uses the separate experimental skhd remap layer. These are not required for basic menu/panel use or direct native commands.
 - Xcode and the project's Swift packages for source builds only; neither Xcode nor Python is required to run a downloaded app.
 
 ### Fresh installation
@@ -225,7 +228,7 @@ External switches that bypass YS, such as Mission Control gestures or direct yab
 2. Download an actually published DMG and its checksum from [Releases](https://github.com/carcot/YabaiSpaces/releases). Verify the checksum, open the DMG, and drag **YabaiSpaces.app** to **Applications**. For upgrades, quit YS and preserve a verified backup before cleanly replacing the old bundle, rather than merging bundles.
 3. Launch **`/Applications/YabaiSpaces.app`**. Grant YS the applicable **Accessibility/Input Monitoring** access for input handling and **Screen Recording** (called **Screen & System Audio Recording** on newer macOS) for screenshots. Restart the affected app if macOS requests it. Follow the signing warning above if Gatekeeper blocks first launch; do not disable system protections.
 4. For actual screenshots, open **Preferences → Button Style → Thumbnail**. The default **Windows** mode shows wallpaper/window outlines, not screenshots. This style setting is shared by the menu bar and panel. Open the panel once for an initial capture; later YS departures refresh the outgoing image immediately before switching.
-5. Optionally configure the [skhd/Karabiner shortcuts](#keyboard-setup-and-skhd). YS does not install this machine's personal mappings for you. Basic menu/panel use and Hyper-Space work without those mappings.
+5. Optionally configure the [keyboard/remapping shortcuts](#keyboard-setup-and-skhd). YS does not install this machine's personal mappings for you. Basic menu/panel use and Hyper-Space work without those mappings.
 
 The [installation guide](docs/INSTALLATION.md) covers permission ownership, checksums, upgrades/rollback, outline fallbacks, and troubleshooting. Avoid stale repository app bundles and permanent launches from temporary build directories; never run two GUI copies sharing the same socket.
 
@@ -353,7 +356,7 @@ After runtime changes: test, preserve/verify the installed-app backup, verify th
 - Fully user-configurable panel hotkeys and a visual grid editor.
 - Full-screen-app distinctions and further multi-monitor validation.
 - Exact chronological focus reconstruction or persistent history across restarts.
-- A compatible, behavior-preserving skhd tap/hold replacement for the remaining Karabiner rules; no upstream schedule is assumed.
+- Broader validation of the separate experimental skhd tap/hold setup, including sleep/wake, reboot and external keyboards; no upstream schedule is assumed.
 - Screen-edge snapping, cross-Space tile insertion, layout restoration, and live animated move/resize.
 
 ## Comparison to Similar Applications
