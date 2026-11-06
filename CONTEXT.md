@@ -4,9 +4,9 @@
 macOS menu bar app that displays clickable space indicators. Integrates with Yabai for space switching.
 
 ## Current State
-- **Version:** 1.12.0 installed locally and [published as latest on GitHub](https://github.com/carcot/YabaiSpaces/releases/tag/v1.12.0), including the memory fix and shared capture service. Downloaded DMG/checksum match local files; see `SESSION_LOG.md`. Historical 1.10.0 has the capture leak.
-- **Status:** Exact packaged clean signed universal Release app verified and installed/restarted; 56 tests pass with no skips. Both backends' footprint tests and actual pixel/timing tests pass. Forty panel cycles after warm-up stayed near 20 MiB; multi-day soak remains unverified.
-- **Last work:** November 4–5, 2026 - restored high-level skhd signing/background registration; user re-approved Accessibility and confirmed Right-Shift, Right-Command, Caps-tap-M and Hyper-Space all work. YS 1.12.0 was unchanged; another sleep/wake cycle remains unverified.
+- **Version:** 1.13.0 installed locally and packaged as a verified universal DMG; see `SESSION_LOG.md` for publication status. Runtime source matches 1.12.0 and retains the memory fix/shared capture service. Historical 1.10.0 has the capture leak.
+- **Status:** Exact packaged clean signed universal Release app verified and installed/restarted; all 56 tests passed with no skips in 105.504 seconds. Both backend memory/pixel/timing checks and two actual panel cycles pass. Another real wake cycle and multi-day soak are not established by this fresh build.
+- **Last work:** November 6, 2026 - committed/pushed the skhd recovery documentation, then prepared and installed the requested fresh 1.13.0 bundle. It does not bundle skhd or implement a new YS sleep/wake fix.
 
 ## Key Files to Know
 | File | Purpose |
@@ -30,7 +30,7 @@ python3 -m unittest discover
 
 ## Important Gotchas
 - **Keyboard layers:** Local taps now use an experimental skhd remap agent/grabber plus pqrs VirtualHIDDevice; ordinary skhd separately dispatches YS commands. Healthy remap/socket/YS state does not prove that high-level skhd is running. See `docs/KEYBOARD_HANDLERS.md` and the latest `SESSION_LOG.md` recovery entry before restarting or changing keyboard ownership.
-- **Installation:** Follow `docs/INSTALLATION.md` and `docs/RELEASE_1.12.0.md`; 1.12.0 includes the previously local 1.11.0 memory fix. Builds use Apple Development signing, not notarized Developer ID distribution signing; check `SESSION_LOG.md` for publication status.
+- **Installation:** Follow `docs/INSTALLATION.md` and `docs/RELEASE_1.13.0.md`; 1.13.0 retains the capture-memory fix and shared service. Builds use Apple Development signing, not notarized Developer ID distribution signing; check `SESSION_LOG.md` for publication status.
 - **Preview modes:** Default Windows means wallpaper/outlines, not screenshots. Preferences → Button Style → Thumbnail enables cached screenshots for both menu bar and panel. No preference was changed by the documentation update.
 - **SIP/no-animation:** Current yabai supports fast SIP-enabled `space --focus` (7.1.19+). The separate `skip_window_focus_animation` option (7.1.22+, improved 7.1.23) is only for setups without the scripting addition; locally it remains off. See README for upstream sources and limitations.
 - **CGImage Leaks:** Always convert CGImage → PNG immediately, cache only PNG Data
